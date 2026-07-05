@@ -14,22 +14,19 @@ Key restrictions:
 
 ## Error Handling
 
-- Use `anyhow::Result` for application-level code (binaries, CLI)
 - Use `thiserror::Error` for library error types that callers will match on
 - Propagate errors with `?` — never `unwrap()` or `expect()`
 
 ## Project Structure
 
-Keep `main.rs` as a thin entry point — argument parsing, logger init, and a call into
-library code. All logic belongs in `lib.rs` (and its modules). `main.rs` is excluded from
-coverage, so anything there is untested by default.
+All logic belongs in `lib.rs` (and its modules). Keep the public API surface small and
+documented; anything callers depend on should have a doc comment with a `# Errors` section
+where relevant.
 
 ## Testing
 
 - Unit tests live inline in a `#[cfg(test)] mod tests` block next to the code they exercise.
-- CLI and integration tests live in `tests/` and drive the built binary with
-  [`assert_cmd`](https://docs.rs/assert_cmd) + [`predicates`](https://docs.rs/predicates)
-  (see `tests/cli.rs`).
+- Integration tests that exercise the public API across modules live in `tests/`.
 - Run the full suite with `just test`.
 - As a file approaches the linecop limit, `just fix-check` ejects its inline
   `#[cfg(test)]` module into a sibling `_tests.rs` file via
@@ -39,7 +36,6 @@ coverage, so anything there is untested by default.
 ## Code Coverage
 
 Minimum 70% coverage enforced via `cargo-tarpaulin`. Run `just cover` to check.
-`main.rs` is excluded — keep it thin and move testable logic to `lib.rs`.
 
 ## CRAP Gate
 
