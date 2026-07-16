@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Process-wide shared default eval `Library`: a `World` with no custom
+  `inputs`/`globals` now clones a shared `Arc` instead of building its own
+  `Library::default()`, so a batch consumer evaluating many short-lived worlds
+  pays for one build total.
+- `SourceSnapshot`: a shareable, cheaply cloneable source cache. Wire it into
+  several worlds via `World::with_shared_sources` so they parse each unique
+  file (e.g. a common imported prelude) exactly once instead of once per
+  world. The default (no `with_shared_sources`) is unchanged: a world still
+  caches sources privately.
+
 ## [0.1.0]
 
 Initial extraction from the mindtape workspace (`crates/typst-world`).

@@ -13,6 +13,12 @@
 //! tree. Marker harvesting on top of this substrate lives in the `typst-harvest`
 //! crate, so `typst-world` stays a pure World + value substrate.
 //!
+//! A batch consumer evaluating many short-lived worlds shares work across them:
+//! every world with no custom `inputs`/`globals` shares one process-wide default
+//! eval library, and [`SourceSnapshot`] lets several worlds share one parsed-source
+//! cache via [`World::with_shared_sources`], so a common imported prelude is
+//! parsed once no matter how many worlds read it.
+//!
 //! ```no_run
 //! use typst_world::World;
 //! # fn run() -> Result<(), typst_world::WorldError> {
@@ -25,6 +31,7 @@
 mod provider;
 #[cfg(feature = "render")]
 mod render;
+mod snapshot;
 mod value;
 mod world;
 
@@ -34,6 +41,7 @@ pub use provider::{
 };
 #[cfg(feature = "render")]
 pub use render::{Frame, render, render_svg};
+pub use snapshot::SourceSnapshot;
 pub use value::{HVal, convert, format_date};
 pub use world::{World, find_project_root, format_diagnostics};
 

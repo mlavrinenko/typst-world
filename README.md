@@ -35,6 +35,12 @@ All byte reads go through a `FileProvider`, so the world is target-agnostic:
 `DiskProvider` reads from disk; `BytesProvider` feeds sources, fonts, and
 packages from embedded bytes for non-native targets (e.g. web builds).
 
+A batch consumer evaluating many short-lived worlds can share work across
+them: a `World` with no custom inputs/globals shares one process-wide default
+eval library, and `SourceSnapshot` lets several worlds share one parsed-source
+cache via `World::with_shared_sources`, so a common imported prelude is parsed
+once no matter how many worlds read it.
+
 ## Development
 
 Prerequisites: [Nix](https://nixos.org/) with flakes enabled.

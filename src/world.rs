@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, LazyLock, Mutex};
 
 use chrono::Datelike;
 use typst::diag::{FileError, FileResult, SourceDiagnostic};
@@ -15,6 +15,16 @@ use typst::{Library, LibraryExt};
 
 use crate::WorldError;
 use crate::provider::{DiskProvider, FileProvider, ProviderCtx};
+use crate::snapshot::SourceSnapshot;
+
+/// Process-wide default eval [`Library`] (no html/render features) — the exact
+/// content [`Library::default()`] builds. A [`World`] with no custom
+/// `inputs`/`globals` clones this `Arc` instead of rebuilding a `Library` from
+/// scratch, so a batch consumer evaluating many short-lived worlds pays for one
+/// build total, not one per world. [`World::with_inputs`]/[`World::with_globals`]
+/// still build and own a per-world custom `Library`.
+static DEFAULT_LIBRARY: LazyLock<Arc<LazyHash<Library>>> =
+    LazyLock::new(|| Arc::new(LazyHash::new(Library::builder().build())));
 
 /// A configurable Typst world. Byte reads go through a [`FileProvider`]; the
 /// world owns the caches, dependency set, and resolution context above it.
@@ -22,10 +32,17 @@ pub struct World {
     root: PathBuf,
     main_id: FileId,
     provider: Box<dyn FileProvider>,
-    library: LazyHash<Library>,
+    /// Shared [`DEFAULT_LIBRARY`] until `inputs`/`globals` are customised, at
+    /// which point [`Self::rebuild_library`] swaps in a fresh, per-world `Arc`.
+    library: Arc<LazyHash<Library>>,
     book: LazyHash<FontBook>,
     fonts: Vec<Font>,
+    /// Private per-world source cache, used when no [`SourceSnapshot`] is
+    /// wired in via [`Self::with_shared_sources`].
     sources: Mutex<HashMap<FileId, Source>>,
+    /// When set, `source()` reads and populates through this shared cache
+    /// instead of [`Self::sources`]. See [`Self::with_shared_sources`].
+    shared_sources: Option<SourceSnapshot>,
     dependencies: Mutex<HashSet<FileId>>,
     /// Package name → in-repo lib directory, for in-tree package development.
     overrides: HashMap<String, PathBuf>,
@@ -51,10 +68,11 @@ impl World {
             root,
             main_id,
             provider,
-            library: LazyHash::new(Library::default()),
+            library: Arc::clone(&DEFAULT_LIBRARY),
             book: LazyHash::new(FontBook::new()),
             fonts: Vec::new(),
             sources: Mutex::new(HashMap::new()),
+            shared_sources: None,
             dependencies: Mutex::new(HashSet::new()),
             overrides: HashMap::new(),
             source_overrides: HashMap::new(),
@@ -116,6 +134,18 @@ impl World {
     #[must_use]
     pub fn with_source_override(mut self, id: FileId, source: impl Into<String>) -> Self {
         self.source_overrides.insert(id, source.into());
+        self
+    }
+
+    /// Route this world's source cache through `snapshot` instead of a private
+    /// per-world cache, so every world sharing `snapshot` parses each unique
+    /// file exactly once — the shape a batch consumer wants when many
+    /// short-lived worlds read from one common file tree (e.g. a shared
+    /// imported prelude). [`Self::with_source_override`] is still consulted
+    /// first on a miss, same as the private-cache path.
+    #[must_use]
+    pub fn with_shared_sources(mut self, snapshot: &SourceSnapshot) -> Self {
+        self.shared_sources = Some(snapshot.clone());
         self
     }
 
@@ -202,7 +232,7 @@ impl World {
         for (name, binding) in self.globals.iter() {
             global.bind(name.clone(), binding.clone());
         }
-        self.library = LazyHash::new(library);
+        self.library = Arc::new(LazyHash::new(library));
     }
 
     /// The project root all virtual paths resolve against.
@@ -224,6 +254,47 @@ impl World {
         {
             deps.insert(id);
         }
+    }
+
+    /// Read `id`'s text via `source_overrides` (if set) or the provider, and
+    /// parse it into a fresh [`Source`]. Shared by [`Self::source_private`] and
+    /// [`Self::source_shared`] on a cache miss; each caller owns inserting the
+    /// result into whichever cache backs it.
+    fn read_source(&self, id: FileId) -> FileResult<Source> {
+        let text = if let Some(synthetic) = self.source_overrides.get(&id) {
+            synthetic.clone()
+        } else {
+            let bytes = self.provider.read(id, &self.ctx())?;
+            String::from_utf8(bytes.to_vec())
+                .map_err(|_| FileError::Other(Some("source is not valid UTF-8".into())))?
+        };
+        Ok(Source::new(id, text))
+    }
+
+    /// `source()` through this world's private per-world cache — the default
+    /// when no [`Self::with_shared_sources`] snapshot is set.
+    fn source_private(&self, id: FileId) -> FileResult<Source> {
+        if let Ok(cache) = self.sources.lock()
+            && let Some(source) = cache.get(&id)
+        {
+            return Ok(source.clone());
+        }
+        let source = self.read_source(id)?;
+        if let Ok(mut cache) = self.sources.lock() {
+            cache.insert(id, source.clone());
+        }
+        Ok(source)
+    }
+
+    /// `source()` through a [`SourceSnapshot`] shared with other worlds:
+    /// consult it first, then populate it on a miss.
+    fn source_shared(&self, id: FileId, snapshot: &SourceSnapshot) -> FileResult<Source> {
+        if let Some(source) = snapshot.get(id) {
+            return Ok(source);
+        }
+        let source = self.read_source(id)?;
+        snapshot.insert(id, source.clone());
+        Ok(source)
     }
 
     /// Project-local files read during evaluation, relative to the root.
@@ -263,23 +334,10 @@ impl typst::World for World {
 
     fn source(&self, id: FileId) -> FileResult<Source> {
         self.record_dependency(id);
-        if let Ok(cache) = self.sources.lock()
-            && let Some(source) = cache.get(&id)
-        {
-            return Ok(source.clone());
+        match &self.shared_sources {
+            Some(snapshot) => self.source_shared(id, snapshot),
+            None => self.source_private(id),
         }
-        let text = if let Some(synthetic) = self.source_overrides.get(&id) {
-            synthetic.clone()
-        } else {
-            let bytes = self.provider.read(id, &self.ctx())?;
-            String::from_utf8(bytes.to_vec())
-                .map_err(|_| FileError::Other(Some("source is not valid UTF-8".into())))?
-        };
-        let source = Source::new(id, text);
-        if let Ok(mut cache) = self.sources.lock() {
-            cache.insert(id, source.clone());
-        }
-        Ok(source)
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
