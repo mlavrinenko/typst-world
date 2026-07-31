@@ -13,6 +13,11 @@
 //! tree. Marker harvesting on top of this substrate lives in the `typst-harvest`
 //! crate, so `typst-world` stays a pure World + value substrate.
 //!
+//! With the `render` feature on, a world's first page compiles to a raster
+//! `Frame` or an SVG string, and `render_with_targets` additionally reports
+//! where each `#link` landed as a `HitTarget` — pointer routing straight out of
+//! Typst's own layout.
+//!
 //! A batch consumer evaluating many short-lived worlds shares work across them:
 //! every world with no custom `inputs`/`globals` shares one process-wide default
 //! eval library, and [`SourceSnapshot`] lets several worlds share one parsed-source
@@ -40,7 +45,7 @@ pub use provider::{
     root_file_id,
 };
 #[cfg(feature = "render")]
-pub use render::{Frame, render, render_svg};
+pub use render::{Frame, HitTarget, render, render_svg, render_with_targets};
 pub use snapshot::SourceSnapshot;
 pub use value::{HVal, convert, format_date};
 pub use world::{World, find_project_root, format_diagnostics};

@@ -41,6 +41,26 @@ eval library, and `SourceSnapshot` lets several worlds share one parsed-source
 cache via `World::with_shared_sources`, so a common imported prelude is parsed
 once no matter how many worlds read it.
 
+### Hit targets
+
+With the `render` feature, `render_with_targets` returns the raster frame plus
+a `HitTarget` for every `#link` on the page — the URL verbatim, and the
+rectangle the layout put it at in page points (top-left origin, same
+orientation as the frame):
+
+```rust,ignore
+let (frame, targets) = typst_world::render_with_targets(&world, 2.0)?;
+```
+
+So a document can declare its own interactive regions — `#link("app:note/60",
+key)` — and the host routes pointer input onto them without repeating any
+layout math. Positions come from the very layout that drew the pixels, over
+the same single compile, so they cannot drift from the frame.
+
+Targets arrive in document order, which is paint order: for overlapping
+targets the last match wins. Only URL destinations are reported; links to a
+label or position inside the document are skipped.
+
 ## Development
 
 Prerequisites: [Nix](https://nixos.org/) with flakes enabled.

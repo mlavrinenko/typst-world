@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `render_with_targets` and `HitTarget` (behind the `render` feature): the
+  raster frame plus the laid-out rectangle of every `#link` on the page, in
+  page points with a top-left origin. A document declares its own interactive
+  regions with `#link("app:action/arg", body)` and the host routes pointer
+  input onto them without redoing layout. Targets come from the same single
+  `typst::compile` the frame does, in document (paint) order, so the last match
+  wins where they overlap; only URL destinations are reported.
+
 ## [0.2.0] - 2026-07-16
 
 ### Added
