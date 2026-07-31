@@ -2,7 +2,11 @@
 
 #show: task.with(
   title: "expose laid-out hit targets from the render path",
-  status: proposed(2026, 7, 31),
+  status: done(
+    2026,
+    7,
+    31,
+  )[render\_with\_targets shipped; gate verified independently on the merged tree],
 )
 
 == Summary
