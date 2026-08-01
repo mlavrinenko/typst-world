@@ -71,6 +71,19 @@ After editing a source, review the listed dependents, update them as needed, the
 run `just outdatty-update` to record the new state into `outdatty.lock` and commit
 it. Add or adjust groups whenever you introduce files that must move together.
 
+## Commit Messages
+
+The backlog lives under `tasks/` as one Typst file per task (see
+[mindtape](https://github.com/mlavrinenko/mindtape)). Every commit footer
+carries `Refs: <task-slug>` — the task's filename stem, for example
+`Refs: gate-the-render-feature-in-just-check` — never the positional id
+`mt ls` prints, which is not stable across board edits.
+
+`chore:` commits for tooling, docs hygiene, or repo housekeeping not tied
+to a task may omit `Refs:`.
+
+If you don't know which task a change belongs to, ask — don't guess.
+
 ## Submitting Changes
 
 1. Run `just check` before submitting — it runs clippy, tests, file size, and drift checks
