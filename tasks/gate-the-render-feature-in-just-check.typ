@@ -2,7 +2,11 @@
 
 #show: task.with(
   title: "gate the render feature in just check",
-  status: proposed(2026, 7, 31),
+  status: done(
+    2026,
+    8,
+    1,
+  )[verified: 34 tests default vs 47 all-features; broke render code and watched the new arm go red],
 )
 
 == Summary
