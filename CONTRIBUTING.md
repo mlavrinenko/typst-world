@@ -28,6 +28,12 @@ where relevant.
 - Unit tests live inline in a `#[cfg(test)] mod tests` block next to the code they exercise.
 - Integration tests that exercise the public API across modules live in `tests/`.
 - Run the full suite with `just test`.
+- `just check` runs clippy and tests twice — once with default features (what
+  ships) and once with `--all-features` (`just clippy-all-features` /
+  `just test-all-features`), so feature-gated code such as `render` is
+  compiled and tested by the primary gate, not just `just cover`. Match that
+  locally with `just clippy-all-features` / `just test-all-features` when
+  touching anything behind a non-default feature.
 - As a file approaches the linecop limit, `just fix-check` ejects its inline
   `#[cfg(test)]` module into a sibling `_tests.rs` file via
   [ejectest](https://github.com/mlavrinenko/ejectest), driven by `linecop --baseline`.

@@ -7,12 +7,18 @@ default:
 # Run fixes, then other checks
 fix-check: eject fmt clippy-fix check
 
-# Run all checks in parallel (fmt + clippy + tests + unused deps + file size + drift)
+# Run all checks in parallel (fmt + clippy + tests + unused deps + file size + drift).
+# Clippy and tests each run twice: default features (what ships) and
+# --all-features (so render-gated code, off by default, is still compiled by
+# the primary gate and not just `just cover`). Two arms, not one substitution —
+# either alone reopens the other build's blind spot.
 check:
     parallel -j 0 -- \
         "chronic just fmt-check" \
-        "chronic cargo clippy --workspace --all-targets -q -- -D warnings" \
-        "chronic cargo test --workspace -q" \
+        "chronic just clippy" \
+        "chronic just clippy-all-features" \
+        "chronic just test" \
+        "chronic just test-all-features" \
         "chronic just machete" \
         "chronic just check-file-size" \
         "chronic just outdatty-check"
@@ -25,13 +31,21 @@ outdatty-check:
 outdatty-update:
     outdatty update
 
-# Run tests only
+# Run tests only (default features — what ships)
 test *ARGS:
     cargo test --workspace {{ ARGS }}
 
-# Run clippy only
+# Run tests with every feature enabled, so render-gated tests run locally too
+test-all-features *ARGS:
+    cargo test --workspace --all-features {{ ARGS }}
+
+# Run clippy only (default features — what ships)
 clippy:
     cargo clippy --workspace --all-targets -q -- -D warnings
+
+# Run clippy with every feature enabled, so render-gated code is linted too
+clippy-all-features:
+    cargo clippy --workspace --all-targets --all-features -q -- -D warnings
 
 # Auto-fix clippy warnings (allow-dirty/-staged: fix-check runs pre-commit, tree is dirty).
 # Restore write on target/ first: tarpaulin (`just cover`/`just crap`) leaves *.rmeta

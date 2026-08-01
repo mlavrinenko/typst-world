@@ -5,6 +5,10 @@
 - See and use [Justfile](Justfile). Add any repeatable and regular operations there.
 - At the end ensure that `just fix-check` is green.
 - Tests: inline `#[cfg(test)]` units next to the code they exercise; add `tests/` integration tests for public-API behaviour that spans modules. `just fix-check` auto-ejects inline tests from oversized files via `ejectest`.
+- `just check` runs clippy and tests with both default and `--all-features`
+  (`just clippy-all-features` / `just test-all-features`), so non-default
+  features like `render` are compiled and tested by the primary gate, not
+  just `just cover`. Match locally when touching feature-gated code.
 - Coverage and CRAP gates run separately (CI + `just validate`): `just cover`
   then `just crap`. If `just crap` flags a function, add tests or reduce its
   branching — don't raise the threshold to dodge it.

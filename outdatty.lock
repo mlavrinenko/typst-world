@@ -9,11 +9,11 @@ groups:
       www/index.html: fa71f9d6ca639fbc2af2ca66520ceda9047fc3a864fb55fd3ba6e6e6d8e8d480
   dev-docs:
     source:
-      Justfile: 9f9ea21f352b88984b3d0331803d16caf7af7729c3dc247f5e1238b217529e06
+      Justfile: dafc5a6111af4ff2d755a1ca6d7145eab352fc2da150a53045d4f1f677b317b7
       flake.nix: a7796d1b64ab0e985d84ed7b32a28f69256a7988ebc6ce2d46924a81cc18ccc6
     dependents:
-      AGENTS.md: e7bff191f105c6360c8884fa79decd1dbb1203111530775c2b5d8987ad5cff66
-      CONTRIBUTING.md: ec9d8fb88fb275d7fa45d62f4dd126f645fc950635e987f23e2381e9b9d986d5
+      AGENTS.md: c28cdb97f557b3300a0511fbe053c529174aee96f9a9006d7174cec72abb86d6
+      CONTRIBUTING.md: c6de43806b6ad88dd1f8afe49c5042003ffd09410b93b2c64dfa6e0176d62428
   release-notes:
     source:
       Cargo.toml: cc4d20dc7c79acd65f870cbca269e5afee0381681b35725846ad6621ae070237
