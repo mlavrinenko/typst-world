@@ -35,6 +35,28 @@ All byte reads go through a `FileProvider`, so the world is target-agnostic:
 `DiskProvider` reads from disk; `BytesProvider` feeds sources, fonts, and
 packages from embedded bytes for non-native targets (e.g. web builds).
 
+### Where `@local` packages come from
+
+By default an `@local/<name>:<version>` import resolves under the platform
+local-package directory, the same place Typst itself looks. Two knobs move
+that: `World::with_local_package(name, dir)` pins one package to an in-repo
+lib directory, and `World::with_package_root(root)` moves the whole lookup —
+`root` being the directory that holds `local/<name>/<version>/`, which is what
+Typst's own `--package-path` names.
+
+```rust,ignore
+let world = World::new(path)?.with_package_root(Some(my_data_dir.join("typst/packages")));
+```
+
+A host with its own data-directory setting wants the second one. The platform
+lookup goes through `dirs`, which reads the environment on Unix only — on
+Windows it calls a known-folder API no variable can move — so exporting
+`XDG_DATA_HOME` redirects the lookup on Linux and nothing anywhere else, and a
+host that installs a package under its own setting would read from a different
+directory than it wrote to. Passing `None` says no local-package directory
+exists at all, leaving only the explicit per-package overrides: an answer, not
+a fall-through to the machine's own.
+
 A batch consumer evaluating many short-lived worlds can share work across
 them: a `World` with no custom inputs/globals shares one process-wide default
 eval library, and `SourceSnapshot` lets several worlds share one parsed-source

@@ -3,7 +3,10 @@
 //!
 //! The world resolves project-local imports against a root directory and
 //! `@local/<name>:<version>` packages against the platform local-package
-//! directory (or a caller-supplied in-repo override). All byte reads go through
+//! directory — or against a caller-supplied in-repo override for one package
+//! ([`World::with_local_package`]), or a caller-named directory for all of them
+//! ([`World::with_package_root`], for a host that keeps its own data-directory
+//! setting and cannot express it through `dirs`). All byte reads go through
 //! a [`FileProvider`], so the world is target-agnostic: native reads disk via
 //! [`DiskProvider`]; a web build feeds sources, fonts, and packages from
 //! embedded bytes behind the same trait ([`BytesProvider`]).
@@ -41,8 +44,8 @@ mod value;
 mod world;
 
 pub use provider::{
-    BytesProvider, DiskProvider, FileProvider, ProviderCtx, local_package_file_id, resolve_path,
-    root_file_id,
+    BytesProvider, DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider,
+    local_package_file_id, resolve_path, root_file_id,
 };
 #[cfg(feature = "render")]
 pub use render::{Frame, HitTarget, render, render_svg, render_with_targets};

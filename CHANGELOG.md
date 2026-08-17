@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-17
+
+### Added
+
+- `World::with_package_root(Option<PathBuf>)` and the `ScopedDiskProvider`
+  behind it: resolve `@local/<name>:<version>` under a directory the caller
+  names — the one holding `local/<name>/<version>/`, what Typst's own
+  `--package-path` names — instead of the platform local-package directory.
+  `None` states that no such directory exists, leaving only the explicit
+  `with_local_package` overrides; it is an answer, not a fall-through to the
+  machine's own. Not calling it keeps the platform lookup, so nothing changes
+  for a world that does not ask.
+
+  The platform lookup goes through `dirs`, which reads the environment on Unix
+  only — on Windows it calls a known-folder API no variable can move. A host
+  that keeps its own data-directory setting therefore could not express it, and
+  would install a package into one directory while reading from another.
+
+  Purely additive: `ProviderCtx`, `DiskProvider` and `resolve_path` are
+  untouched, and both providers resolve through one shared path so they cannot
+  diverge on anything but the package directory.
+
 ## [0.3.0] - 2026-08-01
 
 ### Added

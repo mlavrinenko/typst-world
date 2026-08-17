@@ -40,13 +40,91 @@ pub trait FileProvider: Send + Sync {
     fn read(&self, id: FileId, ctx: &ProviderCtx<'_>) -> FileResult<Bytes>;
 }
 
-/// A [`FileProvider`] that resolves ids to filesystem paths and reads them.
+/// Where a provider looks for a `@local` package that no override names.
+#[derive(Debug, Clone, Default)]
+enum LocalPackages {
+    /// The platform local-package directory — `dirs::data_local_dir()` joined
+    /// with `typst/packages`. What Typst itself uses, and the default.
+    #[default]
+    Platform,
+    /// A caller-named directory holding `local/<name>/<version>/`.
+    At(PathBuf),
+    /// No directory at all: only the explicit overrides resolve, and every
+    /// other `@local` import is a miss. The state a caller asks for when its
+    /// own configuration says the data directory does not exist.
+    Nowhere,
+}
+
+impl LocalPackages {
+    /// The directory `local/<name>/<version>/` hangs off, or `Ok(None)` when
+    /// this provider has no local-package directory to search at all.
+    ///
+    /// `Nowhere` is a resolved answer and reads as a plain miss; only the
+    /// platform lookup *failing* is an error, which is the one case a caller
+    /// cannot have asked for and would otherwise see as a puzzling not-found.
+    fn base(&self) -> FileResult<Option<PathBuf>> {
+        match self {
+            Self::Platform => dirs::data_local_dir()
+                .map(|dir| Some(dir.join("typst").join("packages")))
+                .ok_or_else(|| FileError::Other(Some("could not determine local data dir".into()))),
+            Self::At(dir) => Ok(Some(dir.clone())),
+            Self::Nowhere => Ok(None),
+        }
+    }
+}
+
+/// A [`FileProvider`] that resolves ids to filesystem paths and reads them,
+/// with `@local` packages coming from the platform local-package directory.
+/// [`ScopedDiskProvider`] is the same reader with that directory moved.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DiskProvider;
 
 impl FileProvider for DiskProvider {
     fn read(&self, id: FileId, ctx: &ProviderCtx<'_>) -> FileResult<Bytes> {
         let path = resolve_path(id, ctx)?;
+        let data = std::fs::read(&path).map_err(|err| FileError::from_io(err, &path))?;
+        Ok(Bytes::new(data))
+    }
+}
+
+/// [`DiskProvider`] with the local-package directory chosen by the caller
+/// instead of read off the platform.
+///
+/// The platform lookup goes through `dirs`, which reads the environment on Unix
+/// only — on Windows it calls a known-folder API no variable can move. A host
+/// that keeps its own "where my data lives" setting therefore cannot express it
+/// by exporting `XDG_DATA_HOME`, and would install a package into one directory
+/// while reading from another. Handing the directory in closes that gap on
+/// every platform.
+///
+/// Explicit [`crate::World::with_local_package`] overrides still win; only the
+/// fallback moves.
+#[derive(Debug, Clone, Default)]
+pub struct ScopedDiskProvider {
+    packages: LocalPackages,
+}
+
+impl ScopedDiskProvider {
+    /// Resolve `@local/<name>:<version>` under `root` — the directory holding
+    /// `local/<name>/<version>/`, which is what Typst's own `--package-path`
+    /// names, not the `local/` subdirectory itself.
+    ///
+    /// `None` states that no such directory exists, so only the explicit
+    /// overrides resolve. That is a deliberate answer, not a fall-through: a
+    /// host whose data directory is configured empty means "there is no global
+    /// package here", and quietly reading the machine's own would be the bug
+    /// this type exists to prevent.
+    #[must_use]
+    pub fn new(root: Option<PathBuf>) -> Self {
+        Self {
+            packages: root.map_or(LocalPackages::Nowhere, LocalPackages::At),
+        }
+    }
+}
+
+impl FileProvider for ScopedDiskProvider {
+    fn read(&self, id: FileId, ctx: &ProviderCtx<'_>) -> FileResult<Bytes> {
+        let path = resolve_path_under(id, ctx, &self.packages)?;
         let data = std::fs::read(&path).map_err(|err| FileError::from_io(err, &path))?;
         Ok(Bytes::new(data))
     }
@@ -128,8 +206,19 @@ pub fn local_package_file_id(name: &str, version: &str, vpath: &str) -> Result<F
 /// Returns a [`FileError`] if the path escapes its base or a package namespace
 /// other than `local` (with no override) is requested.
 pub fn resolve_path(id: FileId, ctx: &ProviderCtx<'_>) -> FileResult<PathBuf> {
+    resolve_path_under(id, ctx, &LocalPackages::Platform)
+}
+
+/// [`resolve_path`] with the local-package directory named explicitly — the
+/// one seam between [`DiskProvider`] and [`ScopedDiskProvider`], so the two
+/// cannot resolve the same id differently for any other reason.
+fn resolve_path_under(
+    id: FileId,
+    ctx: &ProviderCtx<'_>,
+    packages: &LocalPackages,
+) -> FileResult<PathBuf> {
     let base = match id.root() {
-        VirtualRoot::Package(spec) => resolve_package(spec, ctx.overrides)?,
+        VirtualRoot::Package(spec) => resolve_package(spec, ctx.overrides, packages)?,
         VirtualRoot::Project => ctx.root.to_path_buf(),
     };
     id.vpath()
@@ -140,15 +229,14 @@ pub fn resolve_path(id: FileId, ctx: &ProviderCtx<'_>) -> FileResult<PathBuf> {
 fn resolve_package(
     spec: &PackageSpec,
     overrides: &HashMap<String, PathBuf>,
+    packages: &LocalPackages,
 ) -> FileResult<PathBuf> {
     if let Some(dir) = overrides.get(spec.name.as_str()) {
         return Ok(dir.clone());
     }
-    if spec.namespace == "local" {
-        let mut path = dirs::data_local_dir()
-            .ok_or_else(|| FileError::Other(Some("could not determine local data dir".into())))?;
-        path.push("typst");
-        path.push("packages");
+    if spec.namespace == "local"
+        && let Some(mut path) = packages.base()?
+    {
         path.push("local");
         path.push(spec.name.as_str());
         path.push(spec.version.to_string());

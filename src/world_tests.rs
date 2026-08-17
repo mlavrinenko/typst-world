@@ -12,7 +12,7 @@ use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 
 use super::{World, find_project_root};
 use crate::SourceSnapshot;
-use crate::provider::{FileProvider, ProviderCtx};
+use crate::provider::{FileProvider, ProviderCtx, local_package_file_id};
 
 #[test]
 fn root_marker_at_start() {
@@ -91,6 +91,43 @@ fn dependencies_lists_non_main_project_files_read_during_source_resolution() {
         world.dependencies().unwrap(),
         vec![PathBuf::from("other.typ")]
     );
+}
+
+/// A disk world plus a package root, end to end: the `@local` source the world
+/// hands back is the one under the named root, not the platform directory the
+/// machine running the test may also have.
+#[test]
+fn with_package_root_serves_a_local_package_from_the_named_root() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("Cargo.toml"), "[package]").unwrap();
+    let main = dir.path().join("main.typ");
+    std::fs::write(&main, "= Hello").unwrap();
+
+    let packages = tempfile::tempdir().unwrap();
+    let lib = packages.path().join("local").join("greet").join("0.1.0");
+    std::fs::create_dir_all(&lib).unwrap();
+    std::fs::write(lib.join("lib.typ"), "#let hi = 1").unwrap();
+
+    let world = World::new(&main)
+        .unwrap()
+        .with_package_root(Some(packages.path().to_path_buf()));
+    let id = local_package_file_id("greet", "0.1.0", "lib.typ").unwrap();
+    assert!(world.source(id).unwrap().text().contains("hi"));
+}
+
+/// The same world with no package root reads no `@local` package at all —
+/// which is what makes the assertion above about the root, and not about
+/// whatever the host happens to have installed.
+#[test]
+fn with_package_root_none_reads_no_local_package() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("Cargo.toml"), "[package]").unwrap();
+    let main = dir.path().join("main.typ");
+    std::fs::write(&main, "= Hello").unwrap();
+
+    let world = World::new(&main).unwrap().with_package_root(None);
+    let id = local_package_file_id("greet", "0.1.0", "lib.typ").unwrap();
+    assert!(world.source(id).is_err());
 }
 
 #[test]

@@ -14,7 +14,7 @@ use typst::utils::LazyHash;
 use typst::{Library, LibraryExt};
 
 use crate::WorldError;
-use crate::provider::{DiskProvider, FileProvider, ProviderCtx};
+use crate::provider::{DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider};
 use crate::snapshot::SourceSnapshot;
 
 /// Process-wide default eval [`Library`] (no html/render features) — the exact
@@ -127,6 +127,30 @@ impl World {
     #[must_use]
     pub fn with_local_package(mut self, name: &str, lib_dir: PathBuf) -> Self {
         self.overrides.insert(name.to_owned(), lib_dir);
+        self
+    }
+
+    /// Resolve `@local/<name>:<version>` packages under `root` instead of the
+    /// platform local-package directory. `root` is the directory holding
+    /// `local/<name>/<version>/` — what Typst's own `--package-path` names —
+    /// and `None` says no such directory exists, leaving only the
+    /// [`Self::with_local_package`] overrides. Not calling this keeps the
+    /// platform lookup, which is what Typst itself does.
+    ///
+    /// For a host that carries its own data-directory setting: `dirs` reads the
+    /// environment on Unix only, so exporting `XDG_DATA_HOME` moves the lookup
+    /// on Linux and nothing on Windows. Passing the directory in is the same
+    /// answer everywhere, and keeps a host from installing a package into one
+    /// directory while reading from another.
+    ///
+    /// Installs a [`ScopedDiskProvider`], replacing this world's provider — so
+    /// it belongs on a disk world ([`Self::new`], [`Self::with_root`]), whose
+    /// provider is the equivalent [`crate::DiskProvider`] anyway. A world built
+    /// on a custom provider ([`Self::with_provider`]) should redirect packages
+    /// inside that provider instead.
+    #[must_use]
+    pub fn with_package_root(mut self, root: Option<PathBuf>) -> Self {
+        self.provider = Box::new(ScopedDiskProvider::new(root));
         self
     }
 
