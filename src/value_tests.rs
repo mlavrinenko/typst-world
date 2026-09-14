@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use typst::foundations::{Datetime, NativeElement, Value};
-use typst_library::model::{EnumItem, LinkElem, ListItem, ParElem, Url};
+use typst_library::model::{EnumItem, LinkElem, ListItem, ParElem, ParbreakElem, Url};
 use typst_library::text::TextElem;
 
 use super::{HVal, convert, format_date};
@@ -48,6 +48,21 @@ fn projects_multi_paragraph_content_with_separators() {
              a bullet another"
                 .to_owned()
         )
+    );
+}
+
+#[test]
+fn projects_a_blank_line_break_with_a_separator() {
+    // A blank line in markup that has never been laid out compiles to a
+    // `ParbreakElem`, not a `ParElem` — this crate is eval-only, and
+    // paragraphs are only grouped into `ParElem` during realization, a
+    // layout-adjacent step eval never runs. A harvested note's blank-line
+    // break is always this shape, never the hand-built one above.
+    let text = |s: &str| TextElem::new(s.into()).pack();
+    let note = text("First line.") + ParbreakElem::shared().clone() + text("Second paragraph.");
+    assert_eq!(
+        convert(&Value::Content(note)),
+        HVal::Str("First line. Second paragraph.".to_owned())
     );
 }
 

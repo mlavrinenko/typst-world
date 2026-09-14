@@ -10,7 +10,7 @@ use std::ops::ControlFlow;
 use ecow::EcoString;
 use typst::foundations::{Content, Datetime, PlainText, Repr, Value};
 use typst_library::model::{
-    Destination, EnumItem, LinkElem, LinkTarget, ListItem, ParElem, TermItem,
+    Destination, EnumItem, LinkElem, LinkTarget, ListItem, ParElem, ParbreakElem, TermItem,
 };
 
 /// A harvested value: the Typst-agnostic projection of a `metadata()` payload.
@@ -148,15 +148,24 @@ fn content_str(content: &Content) -> HVal {
     HVal::Str(plain_text_separated(content))
 }
 
-/// Like [`Content::plain_text`], but a paragraph or a list/enum/term item
-/// costs a separator instead of vanishing. `plain_text()` only concatenates
-/// the leaf text runs it finds while walking the tree, so two paragraphs (or
-/// two bullets) in a status note's trailing block weld together with nothing
-/// between them — "outcome." runs straight into "Second".
+/// Like [`Content::plain_text`], but a paragraph break or a list/enum/term
+/// item costs a separator instead of vanishing. `plain_text()` only
+/// concatenates the leaf text runs it finds while walking the tree, so two
+/// paragraphs (or two bullets) in a status note's trailing block weld
+/// together with nothing between them — "outcome." runs straight into
+/// "Second".
+///
+/// A blank line in markup that has never been laid out — every note harvest
+/// reads, since this crate is eval-only — is a [`ParbreakElem`], not a
+/// [`ParElem`]: paragraphs are only grouped into `ParElem` during
+/// realization, a layout-adjacent step eval alone never runs. `ParElem` is
+/// still checked, for content a caller built by hand or that did go through
+/// realization (e.g. via the `render` feature).
 fn plain_text_separated(content: &Content) -> String {
     let mut text = EcoString::new();
     let _ = content.traverse(&mut |element: Content| -> ControlFlow<()> {
-        let starts_block = element.is::<ParElem>()
+        let starts_block = element.is::<ParbreakElem>()
+            || element.is::<ParElem>()
             || element.is::<ListItem>()
             || element.is::<EnumItem>()
             || element.is::<TermItem>();
