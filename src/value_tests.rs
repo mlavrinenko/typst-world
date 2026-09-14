@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use typst::foundations::{Datetime, NativeElement, Value};
-use typst_library::model::{LinkElem, Url};
+use typst_library::model::{EnumItem, LinkElem, ListItem, ParElem, Url};
 use typst_library::text::TextElem;
 
 use super::{HVal, convert, format_date};
@@ -26,6 +26,39 @@ fn projects_content_to_its_plain_text() {
     // concatenated text, not the element's repr.
     let note = Value::Content(TextElem::new("shim gone".into()).pack());
     assert_eq!(convert(&note), HVal::Str("shim gone".to_owned()));
+}
+
+#[test]
+fn projects_multi_paragraph_content_with_separators() {
+    // A status note's trailing `[…]` block is authored with blank-line
+    // paragraph breaks and a bullet list; `Content::plain_text()` alone
+    // concatenates every leaf text run with nothing between them, welding
+    // "outcome." straight onto "Second" and dropping the list structure
+    // entirely. A paragraph break and a list item must each cost a
+    // separator so the round trip stays readable.
+    let text = |s: &str| TextElem::new(s.into()).pack();
+    let note = ParElem::new(text("First line of the outcome.")).pack()
+        + ParElem::new(text("Second paragraph explaining the decision.")).pack()
+        + ListItem::new(text("a bullet")).pack()
+        + ListItem::new(text("another")).pack();
+    assert_eq!(
+        convert(&Value::Content(note)),
+        HVal::Str(
+            "First line of the outcome. Second paragraph explaining the decision. \
+             a bullet another"
+                .to_owned()
+        )
+    );
+}
+
+#[test]
+fn projects_enum_items_with_separators() {
+    let text = |s: &str| TextElem::new(s.into()).pack();
+    let note = EnumItem::new(text("first")).pack() + EnumItem::new(text("second")).pack();
+    assert_eq!(
+        convert(&Value::Content(note)),
+        HVal::Str("first second".to_owned())
+    );
 }
 
 #[test]

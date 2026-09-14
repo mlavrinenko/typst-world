@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-14
+
+### Fixed
+
+- `convert`'s content projection (`content_str`) no longer flattens a
+  multi-paragraph or list `Content` value into one run-on word.
+  `Content::plain_text()` only concatenates the leaf text it finds while
+  walking the tree, with nothing between a paragraph break or a list item and
+  the text before it — a status note's trailing `[…]` block with a blank-line
+  paragraph break or a bulleted list came back with the break silently
+  dropped, welding two sentences into one. Every `Par`/`ListItem`/`EnumItem`/
+  `TermItem` boundary now costs a separating space.
+
 ## [0.3.1] - 2026-08-17
 
 ### Added

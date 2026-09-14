@@ -2573,11 +2573,12 @@ dependencies = [
 
 [[package]]
 name = "typst-world"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono",
  "comemo",
  "dirs",
+ "ecow",
  "tempfile",
  "thiserror 2.0.18",
  "typst",

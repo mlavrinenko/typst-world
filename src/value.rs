@@ -5,9 +5,13 @@
 //! read harvested markers as `HVal` and never depend on `typst::foundations`.
 
 use std::collections::BTreeMap;
+use std::ops::ControlFlow;
 
-use typst::foundations::{Content, Datetime, Repr, Value};
-use typst_library::model::{Destination, LinkElem, LinkTarget};
+use ecow::EcoString;
+use typst::foundations::{Content, Datetime, PlainText, Repr, Value};
+use typst_library::model::{
+    Destination, EnumItem, LinkElem, LinkTarget, ListItem, ParElem, TermItem,
+};
 
 /// A harvested value: the Typst-agnostic projection of a `metadata()` payload.
 #[derive(Debug, Clone, PartialEq)]
@@ -141,7 +145,30 @@ fn content_str(content: &Content) -> HVal {
     {
         return HVal::Str(url.as_str().to_owned());
     }
-    HVal::Str(content.plain_text().as_str().to_owned())
+    HVal::Str(plain_text_separated(content))
+}
+
+/// Like [`Content::plain_text`], but a paragraph or a list/enum/term item
+/// costs a separator instead of vanishing. `plain_text()` only concatenates
+/// the leaf text runs it finds while walking the tree, so two paragraphs (or
+/// two bullets) in a status note's trailing block weld together with nothing
+/// between them — "outcome." runs straight into "Second".
+fn plain_text_separated(content: &Content) -> String {
+    let mut text = EcoString::new();
+    let _ = content.traverse(&mut |element: Content| -> ControlFlow<()> {
+        let starts_block = element.is::<ParElem>()
+            || element.is::<ListItem>()
+            || element.is::<EnumItem>()
+            || element.is::<TermItem>();
+        if starts_block && !text.is_empty() && !text.ends_with(char::is_whitespace) {
+            text.push(' ');
+        }
+        if let Some(textable) = element.with::<dyn PlainText>() {
+            textable.plain_text(&mut text);
+        }
+        ControlFlow::Continue(())
+    });
+    text.as_str().to_owned()
 }
 
 #[cfg(test)]
