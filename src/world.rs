@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 
 use chrono::Datelike;
-use typst::diag::{FileError, FileResult, SourceDiagnostic};
+use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime, Dict, Duration, Scope, Str, Value};
 use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook};
@@ -416,21 +416,6 @@ pub fn find_project_root(start: &Path) -> PathBuf {
             return start.to_path_buf();
         }
     }
-}
-
-/// Join Typst source diagnostics into one message, falling back to a generic
-/// string when the diagnostic list is empty. Shared by the harvest and render
-/// paths, which both surface eval/compile diagnostics as an error message.
-#[must_use]
-pub fn format_diagnostics(diags: &[SourceDiagnostic]) -> String {
-    if diags.is_empty() {
-        return "unknown evaluation error".to_owned();
-    }
-    diags
-        .iter()
-        .map(|diag| diag.message.as_str().to_owned())
-        .collect::<Vec<_>>()
-        .join("; ")
 }
 
 #[cfg(test)]

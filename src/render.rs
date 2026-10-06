@@ -18,7 +18,7 @@ use typst_render::RenderOptions;
 use typst_svg::SvgOptions;
 
 use crate::WorldError;
-use crate::world::{World, format_diagnostics};
+use crate::world::World;
 
 /// A rendered raster frame: premultiplied RGBA8 pixels plus dimensions, the
 /// channel order the shell presents directly (it owns any channel swap at the
@@ -220,7 +220,7 @@ fn first_page(world: &World) -> Result<Page, WorldError> {
     let world_dyn: &dyn typst::World = world;
     let output = typst::compile::<PagedDocument>(world_dyn).output;
     comemo::evict(EVICT_MAX_AGE);
-    let document = output.map_err(|diags| WorldError::Eval(format_diagnostics(&diags)))?;
+    let document = output.map_err(|diags| WorldError::Eval(world.eval_error(&diags)))?;
     document
         .pages()
         .first()

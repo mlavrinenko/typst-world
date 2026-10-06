@@ -36,6 +36,7 @@
 //! # }
 //! ```
 
+mod diagnostic;
 mod provider;
 #[cfg(feature = "render")]
 mod render;
@@ -43,6 +44,7 @@ mod snapshot;
 mod value;
 mod world;
 
+pub use diagnostic::{Diagnostic, EvalError, Location};
 pub use provider::{
     BytesProvider, DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider,
     local_package_file_id, resolve_path, root_file_id,
@@ -51,7 +53,7 @@ pub use provider::{
 pub use render::{Frame, HitTarget, render, render_svg, render_with_targets};
 pub use snapshot::SourceSnapshot;
 pub use value::{HVal, convert, format_date};
-pub use world::{World, find_project_root, format_diagnostics};
+pub use world::{World, find_project_root};
 
 /// Errors raised while building a world, evaluating, or querying it.
 #[derive(Debug, thiserror::Error)]
@@ -60,9 +62,9 @@ pub enum WorldError {
     #[error("file error: {0}")]
     File(String),
 
-    /// Typst evaluation produced diagnostics.
+    /// Typst evaluation produced diagnostics, resolved to source locations.
     #[error("eval error: {0}")]
-    Eval(String),
+    Eval(EvalError),
 
     /// The world could not be constructed or queried.
     #[error("{0}")]

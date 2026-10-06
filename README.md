@@ -63,6 +63,23 @@ eval library, and `SourceSnapshot` lets several worlds share one parsed-source
 cache via `World::with_shared_sources`, so a common imported prelude is parsed
 once no matter how many worlds read it.
 
+### Eval errors
+
+`World::eval_error(&diags)` turns the diagnostics of a failed `typst_eval::eval`
+or `typst::compile` into an `EvalError`: each `Diagnostic` keeps Typst's
+message, the `Location` (path, 1-based line and column) its span points at,
+and its trace, innermost first. `main_location()` picks the first point inside
+the main file, walking the trace when the error was raised in an imported
+file or package:
+
+```rust,ignore
+// main.typ, line 3: #check(0)   — the assert fails inside lib/check.typ
+let err = world.eval_error(&diags);
+assert_eq!(err.to_string(), "assertion failed: too small");
+let at = err.main_location().unwrap();
+assert_eq!((at.path.as_str(), at.line, at.column), ("main.typ", 3, 2));
+```
+
 ### Hit targets
 
 With the `render` feature, `render_with_targets` returns the raster frame plus

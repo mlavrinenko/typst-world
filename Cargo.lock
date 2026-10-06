@@ -2573,7 +2573,7 @@ dependencies = [
 
 [[package]]
 name = "typst-world"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "comemo",
@@ -2583,6 +2583,7 @@ dependencies = [
  "thiserror 2.0.18",
  "typst",
  "typst-assets",
+ "typst-eval",
  "typst-layout",
  "typst-library",
  "typst-render",

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-07
+
+### Changed
+
+- **Breaking:** `WorldError::Eval` carries an `EvalError` instead of a
+  pre-formatted string, and `format_diagnostics` is gone. An `EvalError` holds
+  every `Diagnostic` — Typst's message, the `Location` its span points at, and
+  its trace — plus the main file's path. Its `Display` is the old string: the
+  messages joined with `; `.
+
+### Added
+
+- `World::eval_error` resolves a failed evaluation's diagnostics against the
+  world, and `World::locate` resolves one span to a `Location`: a root-relative
+  or package-qualified path with a 1-based line and column.
+- `EvalError::main_location` and `Diagnostic::first_in` name the first point of
+  an error inside a given file, walking the trace outward when the error was
+  raised in an imported file, so a caller can point at the line of the main file
+  that led into it.
+
 ## [0.3.2] - 2026-09-14
 
 ### Fixed
