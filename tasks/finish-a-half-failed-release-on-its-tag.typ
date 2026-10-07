@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "finish a half-failed release on its tag",
-  status: wip(2026, 10, 7),
+  status: done(2026, 10, 7),
 )
 
 == Summary
