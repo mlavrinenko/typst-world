@@ -4,8 +4,11 @@ use comemo::Track as _;
 use typst::World as _;
 use typst::engine::{Route, Sink, Traced};
 
-use super::{Diagnostic, EvalError, Location};
-use crate::World;
+use typst::diag::{SourceDiagnostic, Tracepoint};
+use typst::syntax::Span;
+
+use super::{Diagnostic, EvalError, Hint, Location, Severity, TracePoint};
+use crate::{World, WorldError};
 
 /// Write `files` (path, body) into a fresh project rooted at a `Cargo.toml`.
 fn project(files: &[(&str, &str)]) -> tempfile::TempDir {
@@ -50,6 +53,23 @@ fn at(path: &str, line: usize, column: usize) -> Location {
         path: path.to_owned(),
         line,
         column,
+    }
+}
+
+fn point(location: Location) -> TracePoint {
+    TracePoint {
+        message: "while calling `f`".to_owned(),
+        location,
+    }
+}
+
+fn error(message: &str, location: Location) -> Diagnostic {
+    Diagnostic {
+        severity: Severity::Error,
+        message: message.to_owned(),
+        location: Some(location),
+        hints: Vec::new(),
+        trace: Vec::new(),
     }
 }
 
@@ -117,13 +137,12 @@ fn a_package_file_is_named_by_its_spec() {
 #[test]
 fn first_in_walks_the_trace_innermost_first() {
     let diagnostic = Diagnostic {
-        message: "boom".to_owned(),
-        location: Some(at("pkg/lib.typ", 9, 1)),
         trace: vec![
-            at("mid.typ", 4, 1),
-            at("main.typ", 2, 5),
-            at("main.typ", 7, 1),
+            point(at("mid.typ", 4, 1)),
+            point(at("main.typ", 2, 5)),
+            point(at("main.typ", 7, 1)),
         ],
+        ..error("boom", at("pkg/lib.typ", 9, 1))
     };
     assert_eq!(diagnostic.first_in("main.typ"), Some(&at("main.typ", 2, 5)));
     assert_eq!(
@@ -135,16 +154,8 @@ fn first_in_walks_the_trace_innermost_first() {
 
 #[test]
 fn main_location_takes_the_first_diagnostic_that_reaches_main() {
-    let elsewhere = Diagnostic {
-        message: "first".to_owned(),
-        location: Some(at("lib.typ", 1, 1)),
-        trace: Vec::new(),
-    };
-    let in_main = Diagnostic {
-        message: "second".to_owned(),
-        location: Some(at("main.typ", 6, 2)),
-        trace: Vec::new(),
-    };
+    let elsewhere = error("first", at("lib.typ", 1, 1));
+    let in_main = error("second", at("main.typ", 6, 2));
     let err = EvalError {
         main: "main.typ".to_owned(),
         diagnostics: vec![elsewhere, in_main],
@@ -161,4 +172,67 @@ fn an_empty_error_says_so() {
     };
     assert_eq!(err.to_string(), "unknown evaluation error");
     assert_eq!(err.main_location(), None);
+}
+
+#[test]
+fn typst_hints_are_kept() {
+    let err = eval_error(&[("main.typ", "#let a = 1\n#a-b\n")]);
+    let first = err.diagnostics.first().unwrap();
+    assert_eq!(first.severity, Severity::Error);
+    assert_eq!(first.message, "unknown variable: a-b");
+    assert!(
+        first
+            .hints
+            .iter()
+            .any(|hint| hint.message.contains("subtraction") && hint.location.is_none()),
+        "{:?}",
+        first.hints
+    );
+}
+
+#[test]
+fn a_trace_point_says_what_it_passed_through() {
+    let err = eval_error(&[
+        ("lib/check.typ", "#let check(n) = assert(n > 1)\n"),
+        ("main.typ", "#import \"lib/check.typ\": check\n#check(0)\n"),
+    ]);
+    let first = err.diagnostics.first().unwrap();
+    let call = first.trace.first().unwrap();
+    assert_eq!(call.message, "while calling `check`");
+    assert_eq!(call.location, at("main.typ", 2, 2));
+}
+
+#[test]
+fn a_warning_keeps_its_severity_and_hints() {
+    let dir = project(&[("main.typ", "#let x = 1\n")]);
+    let world = World::new(&dir.path().join("main.typ")).unwrap();
+    let warning = SourceDiagnostic::warning(Span::detached(), "careful")
+        .with_hint("generic")
+        .with_tracepoint(Tracepoint::Import("x".into()), Span::detached());
+    let diagnostic = world.diagnostic(&warning);
+    assert_eq!(diagnostic.severity, Severity::Warning);
+    assert_eq!(diagnostic.severity.to_string(), "warning");
+    assert_eq!(diagnostic.location, None);
+    assert_eq!(
+        diagnostic.hints,
+        vec![Hint {
+            message: "generic".to_owned(),
+            location: None,
+        }]
+    );
+    assert!(
+        diagnostic.trace.is_empty(),
+        "a detached point resolves nowhere"
+    );
+}
+
+#[test]
+fn a_location_displays_as_path_line_column() {
+    assert_eq!(at("tasks/a.typ", 3, 17).to_string(), "tasks/a.typ:3:17");
+}
+
+#[test]
+fn an_eval_world_error_displays_typsts_message_alone() {
+    let err = WorldError::Eval(eval_error(&[("main.typ", "#let t = (\"a\" \"b\")\n")]));
+    assert_eq!(err.to_string(), "expected comma");
 }

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-07
+
+### Changed
+
+- **Breaking:** `WorldError::Eval` displays as Typst's message alone, without
+  the `eval error: ` prefix. A caller that wants a prefix adds its own.
+- **Breaking:** `Diagnostic` gains `severity` and `hints`, and its `trace` holds
+  `TracePoint`s (Typst's description of the step, such as
+  ``while calling `check` ``, plus its `Location`) instead of bare `Location`s.
+  Code that builds a `Diagnostic` or reads `trace` must adapt.
+
+### Added
+
+- `Severity` (`Error`, `Warning`; displays as `error`/`warning`), `Hint` (Typst's
+  hint text and the optional `Location` of the code it is about) and
+  `TracePoint`.
+- `World::diagnostic` resolves one `SourceDiagnostic`, warnings included.
+- `Location` displays as `path:line:column`, and `Diagnostic`, `Hint` and
+  `TracePoint` display as their message.
+
 ## [0.4.0] - 2026-10-07
 
 ### Changed

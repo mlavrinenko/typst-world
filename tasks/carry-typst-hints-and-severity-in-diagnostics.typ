@@ -2,7 +2,11 @@
 
 #show: task.with(
   title: "carry hints, severity and trace labels in diagnostics",
-  status: proposed(2026, 10, 7),
+  status: done(
+    2026,
+    10,
+    7,
+  )[Diagnostic carries severity, hints and labelled trace points; World::diagnostic resolves one; WorldError::Eval displays Typst's message alone. 0.5.0.],
 )
 
 == Summary

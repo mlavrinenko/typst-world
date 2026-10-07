@@ -3,7 +3,7 @@ members = [] # Add sub-crate paths here as the project grows
 
 [package]
 name = "typst-world"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Configurable eval-only typst::World over a file-provider trait, plus a Typst-free value tree — a substrate for tools that use Typst as a data medium"

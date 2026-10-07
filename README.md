@@ -66,18 +66,31 @@ once no matter how many worlds read it.
 ### Eval errors
 
 `World::eval_error(&diags)` turns the diagnostics of a failed `typst_eval::eval`
-or `typst::compile` into an `EvalError`: each `Diagnostic` keeps Typst's
-message, the `Location` (path, 1-based line and column) its span points at,
-and its trace, innermost first. `main_location()` picks the first point inside
-the main file, walking the trace when the error was raised in an imported
-file or package:
+or `typst::compile` into an `EvalError`, and `World::diagnostic(&diag)` resolves
+one diagnostic, warnings included. A `Diagnostic` is plain data: its `Severity`,
+Typst's message, the `Location` (path, 1-based line and column) its span points
+at, Typst's `hints` (each with an optional `Location`), and its `trace`,
+innermost first, each `TracePoint` saying what it passed through.
+`main_location()` picks the first point inside the main file, walking the trace
+when the error was raised in an imported file or package.
+
+`Display` is neutral: an `EvalError`, a `WorldError::Eval` or a `Diagnostic`
+prints Typst's message alone, and a `Location` prints `path:line:column`. A
+caller renders the rest its own way:
 
 ```rust,ignore
-// main.typ, line 3: #check(0)   — the assert fails inside lib/check.typ
+// main.typ: #let a = 1 / #a-b
 let err = world.eval_error(&diags);
-assert_eq!(err.to_string(), "assertion failed: too small");
-let at = err.main_location().unwrap();
-assert_eq!((at.path.as_str(), at.line, at.column), ("main.typ", 3, 2));
+assert_eq!(err.to_string(), "unknown variable: a-b");
+for diag in &err.diagnostics {
+    let at = diag.first_in(&err.main).map(ToString::to_string).unwrap_or_default();
+    eprintln!("{}: {at}: {}", diag.severity, diag.message);
+    for hint in &diag.hints {
+        eprintln!("hint: {hint}");
+    }
+}
+// error: main.typ:2:2: unknown variable: a-b
+// hint: if you meant to use subtraction, try adding spaces around the minus sign …
 ```
 
 ### Hit targets

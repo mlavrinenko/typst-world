@@ -1,5 +1,6 @@
-//! Typst diagnostics resolved to source locations: a message, the place its
-//! span points at, and the trace of calls and imports it passed through.
+//! Typst diagnostics as plain data: severity, message, the place the span
+//! points at, Typst's hints, and the trace of calls and imports the problem
+//! passed through. Callers render them; `Display` gives Typst's message alone.
 
 use std::fmt;
 
@@ -10,6 +11,8 @@ use typst::syntax::{DiagSpan, FileId, VirtualRoot};
 use crate::world::World;
 
 /// A point in a source file: its path and 1-based line and column.
+///
+/// Displays as `path:line:column`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Location {
     /// Source path. Root-relative for a project file, or `{pkg-spec}/{vpath}`
@@ -22,16 +25,88 @@ pub struct Location {
     pub column: usize,
 }
 
-/// One Typst diagnostic with its span and trace resolved to [`Location`]s.
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}:{}", self.path, self.line, self.column)
+    }
+}
+
+/// How serious a [`Diagnostic`] is. Displays as `error` or `warning`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Severity {
+    /// A fatal error.
+    Error,
+    /// A non-fatal warning.
+    Warning,
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+        })
+    }
+}
+
+/// One of Typst's hints on a [`Diagnostic`]. Displays as its message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hint {
+    /// Typst's hint text, without a `hint:` prefix.
+    pub message: String,
+    /// The secondary piece of code the hint is about, or `None` for a
+    /// generic hint (Typst's CLI lists those as `hint: …` lines).
+    pub location: Option<Location>,
+}
+
+impl fmt::Display for Hint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+/// One step of a [`Diagnostic`]'s trace: a call, show rule, import or include
+/// the problem passed through. Displays as its message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TracePoint {
+    /// Typst's description of the step, such as ``while calling `check` ``
+    /// or ``while importing `lib.typ` ``.
+    pub message: String,
+    /// Where the step happened.
+    pub location: Location,
+}
+
+impl fmt::Display for TracePoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+/// One Typst diagnostic with its spans resolved to [`Location`]s.
+///
+/// Displays as Typst's message alone; a caller that wants the location,
+/// severity or hints renders them from the fields.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
+    /// Whether this is an error or a warning.
+    pub severity: Severity,
     /// Typst's own message.
     pub message: String,
     /// Where the diagnostic's span points, when it resolves to a source file.
     pub location: Option<Location>,
+    /// Typst's hints, in the order it gave them.
+    pub hints: Vec<Hint>,
     /// The trace from the span outward, innermost first: each call, show rule,
-    /// import or include the error passed through on its way to the main file.
-    pub trace: Vec<Location>,
+    /// import or include the problem passed through on its way to the main
+    /// file. Points whose span resolves to no source file are left out.
+    pub trace: Vec<TracePoint>,
+}
+
+impl fmt::Display for Diagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
 }
 
 impl Diagnostic {
@@ -43,7 +118,7 @@ impl Diagnostic {
     pub fn first_in(&self, path: &str) -> Option<&Location> {
         self.location
             .iter()
-            .chain(&self.trace)
+            .chain(self.trace.iter().map(|point| &point.location))
             .find(|location| location.path == path)
     }
 }
@@ -89,21 +164,40 @@ impl World {
     /// Resolve Typst's diagnostics against this world into an [`EvalError`].
     #[must_use]
     pub fn eval_error(&self, diags: &[SourceDiagnostic]) -> EvalError {
-        let diagnostics = diags
-            .iter()
-            .map(|diag| Diagnostic {
-                message: diag.message.as_str().to_owned(),
-                location: self.locate(diag.span),
-                trace: diag
-                    .trace
-                    .iter()
-                    .filter_map(|point| self.locate(point.span))
-                    .collect(),
-            })
-            .collect();
         EvalError {
             main: file_path(typst::World::main(self)),
-            diagnostics,
+            diagnostics: diags.iter().map(|diag| self.diagnostic(diag)).collect(),
+        }
+    }
+
+    /// Resolve one Typst diagnostic, error or warning, against this world.
+    #[must_use]
+    pub fn diagnostic(&self, diag: &SourceDiagnostic) -> Diagnostic {
+        Diagnostic {
+            severity: match diag.severity {
+                typst::diag::Severity::Error => Severity::Error,
+                typst::diag::Severity::Warning => Severity::Warning,
+            },
+            message: diag.message.as_str().to_owned(),
+            location: self.locate(diag.span),
+            hints: diag
+                .hints
+                .iter()
+                .map(|hint| Hint {
+                    message: hint.v.as_str().to_owned(),
+                    location: self.locate(hint.span),
+                })
+                .collect(),
+            trace: diag
+                .trace
+                .iter()
+                .filter_map(|point| {
+                    Some(TracePoint {
+                        message: point.v.to_string(),
+                        location: self.locate(point.span)?,
+                    })
+                })
+                .collect(),
         }
     }
 

@@ -44,7 +44,7 @@ mod snapshot;
 mod value;
 mod world;
 
-pub use diagnostic::{Diagnostic, EvalError, Location};
+pub use diagnostic::{Diagnostic, EvalError, Hint, Location, Severity, TracePoint};
 pub use provider::{
     BytesProvider, DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider,
     local_package_file_id, resolve_path, root_file_id,
@@ -63,7 +63,9 @@ pub enum WorldError {
     File(String),
 
     /// Typst evaluation produced diagnostics, resolved to source locations.
-    #[error("eval error: {0}")]
+    /// Displays as Typst's message alone; render hints and locations from
+    /// the [`EvalError`].
+    #[error("{0}")]
     Eval(EvalError),
 
     /// The world could not be constructed or queried.
