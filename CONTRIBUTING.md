@@ -84,6 +84,15 @@ to a task may omit `Refs:`.
 
 If you don't know which task a change belongs to, ask — don't guess.
 
+## Releasing
+
+Bump `version` in `Cargo.toml`, give it a dated `CHANGELOG.md` section, commit,
+push main and wait for CI. Then run `just release X.Y.Z --dry-run`, and
+`just release X.Y.Z` once it passes. The tag push is the only publish path:
+never `cargo publish` by hand. A release whose workflow failed is finished on
+the same tag with `gh workflow run release.yml -f tag=vX.Y.Z`; a pushed tag never
+moves.
+
 ## Submitting Changes
 
 1. Run `just check` before submitting — it runs clippy, tests, file size, and drift checks
