@@ -2,7 +2,10 @@
 
 use typst::foundations::{Dict, Str, Value};
 
-use super::{Frame, HitTarget, render, render_with_targets};
+use super::{
+    EVICT_MAX_AGE, Frame, HitTarget, compile_page, evict, hit_targets, rasterise, render,
+    render_with_targets,
+};
 use crate::World;
 
 /// A small fixed-size page, kept tiny so rasterisation stays fast in tests.
@@ -278,4 +281,26 @@ fn a_missing_page_is_an_error_for_the_target_path_too() {
     let world = World::new(&file).unwrap().with_fonts();
 
     assert!(render_with_targets(&world, 1.0).is_err());
+}
+
+#[test]
+fn rasterising_a_compiled_page_matches_render() {
+    let (_dir, file) = world_for("#link(\"app:go\")[go] and some text.");
+    let world = World::new(&file).unwrap().with_fonts();
+
+    let page = compile_page(&world).unwrap();
+    assert_eq!(rasterise(&page, 2.0), render(&world, 2.0).unwrap());
+    let (_, targets) = render_with_targets(&world, 2.0).unwrap();
+    assert_eq!(hit_targets(&page), targets);
+}
+
+#[test]
+fn compile_page_reports_the_same_error_as_render() {
+    let (_dir, file) = world_for("#panic(\"boom\")");
+    let world = World::new(&file).unwrap().with_fonts();
+
+    let compiled = compile_page(&world).unwrap_err().to_string();
+    assert_eq!(compiled, render(&world, 1.0).unwrap_err().to_string());
+    // A caller driving eviction itself can run it at any time.
+    evict(EVICT_MAX_AGE);
 }

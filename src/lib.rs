@@ -50,7 +50,10 @@ pub use provider::{
     local_package_file_id, resolve_path, root_file_id,
 };
 #[cfg(feature = "render")]
-pub use render::{Frame, HitTarget, render, render_svg, render_with_targets};
+pub use render::{
+    EVICT_MAX_AGE, Frame, HitTarget, Page, compile_page, evict, hit_targets, rasterise, render,
+    render_svg, render_with_targets,
+};
 pub use snapshot::SourceSnapshot;
 pub use value::{HVal, convert, format_date};
 pub use world::{World, find_project_root};

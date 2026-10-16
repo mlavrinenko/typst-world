@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `compile_page` compiles a world's main file and returns its first laid-out
+  `Page` (re-exported) without evicting comemo's cache. `rasterise` and
+  `hit_targets` read such a page, and `evict` with `EVICT_MAX_AGE` lets the
+  caller trim the cache when it suits it, such as after presenting a frame
+  rather than inside it. `render`, `render_with_targets` and `render_svg` still
+  evict after every compile.
+
 ## [0.5.0] - 2026-10-07
 
 ### Changed

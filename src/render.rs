@@ -9,11 +9,18 @@
 //! rectangle in the frame Typst just drew. [`render_with_targets`] hands those
 //! back alongside the raster as [`HitTarget`]s, so a host can route pointer input
 //! onto the rendered document without redoing any layout math.
+//!
+//! [`render`], [`render_with_targets`] and [`render_svg`] run the whole pipeline
+//! in one call. A host that redraws on every input tick can split it instead:
+//! [`compile_page`] hands back the laid-out [`Page`], [`rasterise`] and
+//! [`hit_targets`] read it, and [`evict`] trims comemo's cache whenever the host
+//! has time — after presenting the frame rather than inside it.
 
 use typst::layout::{Abs, Frame as LayoutFrame, FrameItem, Point, Size, Transform};
 use typst::model::{Destination, Url};
 use typst::utils::Scalar;
-use typst_layout::{Page, PagedDocument};
+pub use typst_layout::Page;
+use typst_layout::PagedDocument;
 use typst_render::RenderOptions;
 use typst_svg::SvgOptions;
 
@@ -71,7 +78,7 @@ pub struct HitTarget {
 /// Returns [`WorldError::Eval`] if compilation produces fatal diagnostics, or
 /// [`WorldError::World`] if the document has no pages.
 pub fn render(world: &World, pixels_per_point: f32) -> Result<Frame, WorldError> {
-    let page = first_page(world)?;
+    let page = evicting(compile_page(world))?;
     Ok(rasterise(&page, pixels_per_point))
 }
 
@@ -96,15 +103,15 @@ pub fn render_with_targets(
     world: &World,
     pixels_per_point: f32,
 ) -> Result<(Frame, Vec<HitTarget>), WorldError> {
-    let page = first_page(world)?;
-    let targets = hit_targets(&page.frame);
+    let page = evicting(compile_page(world))?;
+    let targets = hit_targets(&page);
     Ok((rasterise(&page, pixels_per_point), targets))
 }
 
 /// Rasterise one laid-out page at `pixels_per_point` into a presentable
-/// [`Frame`]. Split out of [`render`] so [`render_with_targets`] produces the
-/// same pixels from the same compile instead of issuing a second one.
-fn rasterise(page: &Page, pixels_per_point: f32) -> Frame {
+/// [`Frame`]: the pixels [`render`] returns for the page it compiled.
+#[must_use]
+pub fn rasterise(page: &Page, pixels_per_point: f32) -> Frame {
     let opts = RenderOptions {
         pixel_per_pt: Scalar::new(f64::from(pixels_per_point)),
         render_bleed: false,
@@ -124,15 +131,17 @@ fn rasterise(page: &Page, pixels_per_point: f32) -> Frame {
 /// # Errors
 /// As [`render`].
 pub fn render_svg(world: &World) -> Result<String, WorldError> {
-    let page = first_page(world)?;
+    let page = evicting(compile_page(world))?;
     Ok(typst_svg::svg(&page, &SvgOptions::default()))
 }
 
-/// Collect every URL link rectangle in a laid-out page frame, in document
-/// order.
-fn hit_targets(frame: &LayoutFrame) -> Vec<HitTarget> {
+/// Collect every URL link rectangle on a laid-out page, in document order: the
+/// targets [`render_with_targets`] reports. See [`HitTarget`] for the
+/// coordinates and the last-match-wins rule overlapping targets follow.
+#[must_use]
+pub fn hit_targets(page: &Page) -> Vec<HitTarget> {
     let mut targets = Vec::new();
-    push_hit_targets(frame, Transform::identity(), &mut targets);
+    push_hit_targets(&page.frame, Transform::identity(), &mut targets);
     targets
 }
 
@@ -204,22 +213,44 @@ fn to_pt_f32(length: Abs) -> f32 {
     length.to_pt() as f32
 }
 
-/// How many [`comemo::evict`] passes a memoized result may go unused before
-/// eviction. comemo's cache is process-global and every `typst::compile` call
-/// feeds it, so a session's thousands of re-renders (redraw on every MIDI
-/// note/key/resize tick) grow it unbounded unless something evicts. Called once
-/// per compile below, so `EVICT_MAX_AGE` frames of the same unreferenced result
-/// survive before it is dropped — enough to keep memoized layout warm across a
-/// short burst of frames without letting the cache grow without bound.
-const EVICT_MAX_AGE: usize = 10;
+/// How many [`evict`] passes a memoized result may go unused before eviction.
+/// comemo's cache is process-global and every `typst::compile` call feeds it,
+/// so a session's thousands of re-renders (redraw on every input tick) grow it
+/// unbounded unless something evicts. [`render`], [`render_with_targets`] and
+/// [`render_svg`] evict at this age once per compile, so `EVICT_MAX_AGE` frames
+/// of the same unreferenced result survive before it is dropped: enough to keep
+/// memoized layout warm across a short burst of frames without letting the
+/// cache grow without bound.
+pub const EVICT_MAX_AGE: usize = 10;
 
-/// Compile `world`'s main file and hand back its first page, evicting comemo's
-/// global memoization cache afterwards (see [`EVICT_MAX_AGE`]) so the cache
-/// stays bounded across the many compiles one render loop issues.
-fn first_page(world: &World) -> Result<Page, WorldError> {
+/// Drop every memoized result that has gone unused for `max_age` eviction
+/// passes, and age the rest by one pass.
+///
+/// The pass walks the whole process-global cache, which costs milliseconds once
+/// a large document has filled it. A [`compile_page`] caller owns this call: run
+/// it once per compile, at a moment the walk delays no frame, at
+/// [`EVICT_MAX_AGE`] unless it has reason to keep results longer.
+pub fn evict(max_age: usize) {
+    comemo::evict(max_age);
+}
+
+/// Run [`evict`] at [`EVICT_MAX_AGE`] after a compile, passing its result on.
+fn evicting<T>(compiled: Result<T, WorldError>) -> Result<T, WorldError> {
+    evict(EVICT_MAX_AGE);
+    compiled
+}
+
+/// Compile `world`'s main file and hand back its first laid-out page.
+///
+/// Unlike [`render`], this does not evict comemo's cache: a caller that
+/// compiles repeatedly runs [`evict`] itself, or the cache grows with every
+/// distinct compile.
+///
+/// # Errors
+/// As [`render`].
+pub fn compile_page(world: &World) -> Result<Page, WorldError> {
     let world_dyn: &dyn typst::World = world;
     let output = typst::compile::<PagedDocument>(world_dyn).output;
-    comemo::evict(EVICT_MAX_AGE);
     let document = output.map_err(|diags| WorldError::Eval(world.eval_error(&diags)))?;
     document
         .pages()

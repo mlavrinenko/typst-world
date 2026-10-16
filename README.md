@@ -113,6 +113,20 @@ Targets arrive in document order, which is paint order: for overlapping
 targets the last match wins. Only URL destinations are reported; links to a
 label or position inside the document are skipped.
 
+### Frame loops
+
+`render*` compile, evict comemo's cache, and return pixels in one call. A host
+that redraws on every input tick can take the steps apart and evict once the
+frame is on screen:
+
+```rust,ignore
+let page = typst_world::compile_page(&world)?;
+let frame = typst_world::rasterise(&page, 2.0);
+let targets = typst_world::hit_targets(&page);
+present(&frame);
+typst_world::evict(typst_world::EVICT_MAX_AGE);
+```
+
 ## Development
 
 Prerequisites: [Nix](https://nixos.org/) with flakes enabled.
