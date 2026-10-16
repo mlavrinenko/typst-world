@@ -68,7 +68,7 @@ cover:
 # Gate complex, undertested functions via CRAP metric. Needs lcov from `just
 # cover` first. Threshold 30 is a sane greenfield default; tune per repo.
 crap:
-    cargo crap --lcov target/coverage/lcov.info --workspace --exclude 'src/main.rs' --threshold 30 --fail-above
+    cargo crap --lcov target/coverage/lcov.info --workspace --exclude 'src/main.rs' --threshold 30 --fail-above --format github
 
 # Format code
 fmt:
