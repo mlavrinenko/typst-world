@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "rasterise only what changed between two pages",
-  status: wip(2026, 10, 17),
+  status: done(2026, 10, 17)[released in 0.5.2],
 )
 
 == Summary
