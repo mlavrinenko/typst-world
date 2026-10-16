@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "split compile from rasterise in the render path",
-  status: wip(2026, 10, 16),
+  status: done(2026, 10, 17)[released in 0.5.1],
 )
 
 == Summary
