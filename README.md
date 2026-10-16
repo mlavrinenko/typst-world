@@ -127,6 +127,16 @@ present(&frame);
 typst_world::evict(typst_world::EVICT_MAX_AGE);
 ```
 
+Keep the page and its frame, and the next tick redraws only what changed.
+`rasterise_changes` compares the two pages, redraws the damaged pixels, and
+returns them; the frame ends up byte-identical to a full `rasterise`:
+
+```rust,ignore
+let next = typst_world::compile_page(&world)?;
+let damaged = typst_world::rasterise_changes(&mut frame, &page, &next, 2.0);
+page = next;
+```
+
 ## Development
 
 Prerequisites: [Nix](https://nixos.org/) with flakes enabled.

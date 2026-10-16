@@ -36,6 +36,8 @@
 //! # }
 //! ```
 
+#[cfg(feature = "render")]
+mod damage;
 mod diagnostic;
 mod provider;
 #[cfg(feature = "render")]
@@ -44,6 +46,8 @@ mod snapshot;
 mod value;
 mod world;
 
+#[cfg(feature = "render")]
+pub use damage::{PixelRect, damage, rasterise_changes};
 pub use diagnostic::{Diagnostic, EvalError, Hint, Location, Severity, TracePoint};
 pub use provider::{
     BytesProvider, DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider,

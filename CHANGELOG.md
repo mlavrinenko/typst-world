@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `damage` names the pixel rectangles (`PixelRect`) where two laid-out pages
+  can differ once rasterised, and `rasterise_changes` brings a raster of the
+  first up to date with the second by redrawing only those. The result is
+  byte-identical to rasterising the second page whole: the page is rasterised
+  at its own transform with the items outside the damage dropped, and only the
+  damaged rectangles are copied out.
+
 ## [0.5.1] - 2026-10-17
 
 ### Added
