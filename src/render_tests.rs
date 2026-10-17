@@ -304,3 +304,42 @@ fn compile_page_reports_the_same_error_as_render() {
     // A caller driving eviction itself can run it at any time.
     evict(EVICT_MAX_AGE);
 }
+
+/// The bytes of one bundled font, by family, to stand in for a caller's own.
+fn bundled_font(family: &str) -> &'static [u8] {
+    use typst::foundations::Bytes;
+    use typst::text::Font;
+    typst_assets::fonts()
+        .find(|data| Font::new(Bytes::new(*data), 0).is_some_and(|f| f.info().family == family))
+        .unwrap()
+}
+
+#[test]
+fn an_added_font_draws_without_the_bundled_set() {
+    let (_dir, file) = world_for("#text(font: \"DejaVu Sans Mono\", fallback: false)[mono]");
+    let bare = render(&World::new(&file).unwrap(), 1.0).unwrap();
+    let added = World::new(&file)
+        .unwrap()
+        .with_font(bundled_font("DejaVu Sans Mono"));
+    let drawn = render(&added, 1.0).unwrap();
+    assert!(bare.rgba.iter().all(|&byte| byte == 255));
+    assert!(drawn.rgba.iter().any(|&byte| byte != 255));
+}
+
+#[test]
+fn an_added_font_joins_the_bundled_set() {
+    let (_dir, file) = world_for("#text(font: \"DejaVu Sans Mono\", fallback: false)[mono] plain");
+    let base = World::new(&file).unwrap().with_fonts();
+    let with_extra = World::new(&file)
+        .unwrap()
+        .with_fonts()
+        .with_font(bundled_font("DejaVu Sans Mono"));
+    use typst::World as _;
+    assert_eq!(
+        with_extra.book().families().count(),
+        base.book().families().count()
+    );
+    let faces = (0..).take_while(|i| base.font(*i).is_some()).count();
+    assert!(with_extra.font(faces).is_some());
+    assert!(render(&with_extra, 1.0).is_ok());
+}

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `World::with_font` adds a caller's own font faces (bytes) beside the bundled
+  ones, for a face typst-assets lacks, such as a music font, on targets with
+  no system fonts.
+
 ## [0.5.2] - 2026-10-17
 
 ### Added

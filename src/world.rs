@@ -247,6 +247,23 @@ impl World {
         self
     }
 
+    /// Add the font faces in `data` beside whatever fonts the world already
+    /// has: a music font, or a caller's own face on web or Android where no
+    /// system fonts exist. Chains after [`Self::with_fonts`], which replaces
+    /// the set, so call that first.
+    #[cfg(feature = "render")]
+    #[must_use]
+    pub fn with_font(mut self, data: impl AsRef<[u8]> + Send + Sync + 'static) -> Self {
+        let bytes = Bytes::new(data);
+        let mut book = FontBook::clone(&self.book);
+        for font in Font::iter(bytes) {
+            book.push(font.info().clone());
+            self.fonts.push(font);
+        }
+        self.book = LazyHash::new(book);
+        self
+    }
+
     /// Rebuild the evaluation library from the current `inputs`, then re-apply
     /// the accumulated `globals`. Called whenever either changes so the two stay
     /// independent of call order.
