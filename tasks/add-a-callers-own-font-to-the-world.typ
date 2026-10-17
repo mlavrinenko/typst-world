@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "add a caller's own font to the world",
-  status: done(2026, 10, 17),
+  status: done(2026, 10, 17)[released in 0.5.3],
 )
 
 == Summary

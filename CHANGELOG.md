@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-17
+
 ### Added
 
 - `World::with_font` adds a caller's own font faces (bytes) beside the bundled
