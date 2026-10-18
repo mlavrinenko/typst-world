@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-18
+
 ### Added
 
 - `FontSet` (render feature) is one loaded book and set of faces, cheap to

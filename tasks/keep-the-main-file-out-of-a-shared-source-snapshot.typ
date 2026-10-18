@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "keep the main file out of a shared source snapshot",
-  status: done(2026, 10, 18),
+  status: done(2026, 10, 18)[released in 0.5.4],
 )
 
 == Summary

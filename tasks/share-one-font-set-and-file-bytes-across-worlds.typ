@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "share one font set and file bytes across worlds",
-  status: done(2026, 10, 18),
+  status: done(2026, 10, 18)[released in 0.5.4],
 )
 
 == Summary
