@@ -39,6 +39,18 @@ fn bytes_provider_serves_registered_file() {
 }
 
 #[test]
+fn bytes_provider_serves_registered_bytes_without_copying() {
+    let id = root_file_id("data.bin").unwrap();
+    let shared = typst::foundations::Bytes::new(b"payload".to_vec());
+    let provider = BytesProvider::new().with_bytes(id, shared.clone());
+    let overrides = HashMap::new();
+    let ctx = ctx_with(Path::new("/virtual"), &overrides);
+    let served = provider.read(id, &ctx).unwrap();
+    assert_eq!(served.as_ptr(), shared.as_ptr());
+    assert_eq!(served.as_slice(), b"payload");
+}
+
+#[test]
 fn bytes_provider_missing_file_errors() {
     let id = root_file_id("main.typ").unwrap();
     let provider = BytesProvider::new();

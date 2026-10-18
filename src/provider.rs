@@ -153,6 +153,15 @@ impl BytesProvider {
         self.files.insert(id, Bytes::new(bytes.into()));
         self
     }
+
+    /// Register an already-built `bytes` under `id` without copying it, so a
+    /// host's process-wide copy keeps one allocation and one cached hash
+    /// across every provider it is handed to.
+    #[must_use]
+    pub fn with_bytes(mut self, id: FileId, bytes: Bytes) -> Self {
+        self.files.insert(id, bytes);
+        self
+    }
 }
 
 impl FileProvider for BytesProvider {

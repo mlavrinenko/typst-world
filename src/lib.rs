@@ -25,7 +25,9 @@
 //! every world with no custom `inputs`/`globals` shares one process-wide default
 //! eval library, and [`SourceSnapshot`] lets several worlds share one parsed-source
 //! cache via [`World::with_shared_sources`], so a common imported prelude is
-//! parsed once no matter how many worlds read it.
+//! parsed once no matter how many worlds read it. With `render` on, a `FontSet`
+//! built once and handed out via `World::with_font_set` keeps one copy of each
+//! face, and [`BytesProvider::with_bytes`] does the same for embedded files.
 //!
 //! ```no_run
 //! use typst_world::World;
@@ -39,6 +41,7 @@
 #[cfg(feature = "render")]
 mod damage;
 mod diagnostic;
+mod fonts;
 mod provider;
 #[cfg(feature = "render")]
 mod render;
@@ -49,6 +52,8 @@ mod world;
 #[cfg(feature = "render")]
 pub use damage::{PixelRect, damage, rasterise_changes};
 pub use diagnostic::{Diagnostic, EvalError, Hint, Location, Severity, TracePoint};
+#[cfg(feature = "render")]
+pub use fonts::FontSet;
 pub use provider::{
     BytesProvider, DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider,
     local_package_file_id, resolve_path, root_file_id,

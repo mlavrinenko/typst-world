@@ -63,6 +63,20 @@ eval library, and `SourceSnapshot` lets several worlds share one parsed-source
 cache via `World::with_shared_sources`, so a common imported prelude is parsed
 once no matter how many worlds read it.
 
+Typst caches a `Bytes` hash inside the value, so a fresh copy per world means
+re-hashing the same data in every world. With `render` on, build a `FontSet`
+once and hand it out; `with_fonts` already shares one process-wide bundled set.
+`BytesProvider::with_bytes` does the same for embedded files.
+
+```rust,ignore
+let fonts = FontSet::bundled().with_font(my_font_bytes);
+let logo = Bytes::new(logo_png);
+let world = World::with_provider(main, root, Box::new(
+    BytesProvider::new().with_file(main, doc).with_bytes(logo_id, logo.clone()),
+))
+.with_font_set(&fonts);
+```
+
 ### Eval errors
 
 `World::eval_error(&diags)` turns the diagnostics of a failed `typst_eval::eval`

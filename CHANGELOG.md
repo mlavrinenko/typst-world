@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `FontSet` (render feature) is one loaded book and set of faces, cheap to
+  clone, and `World::with_font_set` hands it to a world. Worlds given one set
+  serve the same font data, so Typst hashes each face once rather than once
+  per world. `World::with_fonts` now reads one process-wide bundled set.
+- `BytesProvider::with_bytes` registers an already-built `Bytes` without
+  copying it, so a host's process-wide copy of an embedded file is shared.
+
 ## [0.5.3] - 2026-10-17
 
 ### Added

@@ -14,6 +14,7 @@ use typst::utils::LazyHash;
 use typst::{Library, LibraryExt};
 
 use crate::WorldError;
+use crate::fonts::FontSet;
 use crate::provider::{DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider};
 use crate::snapshot::SourceSnapshot;
 
@@ -35,8 +36,8 @@ pub struct World {
     /// Shared [`DEFAULT_LIBRARY`] until `inputs`/`globals` are customised, at
     /// which point [`Self::rebuild_library`] swaps in a fresh, per-world `Arc`.
     library: Arc<LazyHash<Library>>,
-    book: LazyHash<FontBook>,
-    fonts: Vec<Font>,
+    /// Shared book + faces; [`Self::with_font_set`] swaps in a caller's set.
+    fonts: FontSet,
     /// Private per-world source cache, used when no [`SourceSnapshot`] is
     /// wired in via [`Self::with_shared_sources`].
     sources: Mutex<HashMap<FileId, Source>>,
@@ -69,8 +70,7 @@ impl World {
             main_id,
             provider,
             library: Arc::clone(&DEFAULT_LIBRARY),
-            book: LazyHash::new(FontBook::new()),
-            fonts: Vec::new(),
+            fonts: FontSet::default(),
             sources: Mutex::new(HashMap::new()),
             shared_sources: None,
             dependencies: Mutex::new(HashSet::new()),
@@ -229,38 +229,34 @@ impl World {
     /// Load the bundled fonts (Libertinus Serif, New Computer Modern, `DejaVu`
     /// Sans Mono) so the world can lay out and render text. Embedded bytes, so
     /// the same call works on web where no system fonts exist. Required before
-    /// [`crate::render`]; the eval/harvest preset leaves fonts off.
+    /// [`crate::render`]; the eval/harvest preset leaves fonts off. Every call
+    /// shares one process-wide [`FontSet::bundled`], so the faces load once.
     #[cfg(feature = "render")]
     #[must_use]
     pub fn with_fonts(mut self) -> Self {
-        let mut book = FontBook::new();
-        let mut fonts = Vec::new();
-        for data in typst_assets::fonts() {
-            let bytes = Bytes::new(data);
-            for font in Font::iter(bytes.clone()) {
-                book.push(font.info().clone());
-                fonts.push(font);
-            }
-        }
-        self.book = LazyHash::new(book);
-        self.fonts = fonts;
+        self.fonts = FontSet::bundled();
+        self
+    }
+
+    /// Replace the world's fonts with `set`, sharing its book and faces with
+    /// every other world given the same set, so their data is hashed once.
+    #[cfg(feature = "render")]
+    #[must_use]
+    pub fn with_font_set(mut self, set: &FontSet) -> Self {
+        self.fonts = set.clone();
         self
     }
 
     /// Add the font faces in `data` beside whatever fonts the world already
     /// has: a music font, or a caller's own face on web or Android where no
-    /// system fonts exist. Chains after [`Self::with_fonts`], which replaces
-    /// the set, so call that first.
+    /// system fonts exist. Chains after [`Self::with_fonts`] or
+    /// [`Self::with_font_set`], which replace the set, so call those first.
+    /// Faces added here belong to this world alone; put a face many worlds
+    /// share in a [`FontSet`] instead.
     #[cfg(feature = "render")]
     #[must_use]
     pub fn with_font(mut self, data: impl AsRef<[u8]> + Send + Sync + 'static) -> Self {
-        let bytes = Bytes::new(data);
-        let mut book = FontBook::clone(&self.book);
-        for font in Font::iter(bytes) {
-            book.push(font.info().clone());
-            self.fonts.push(font);
-        }
-        self.book = LazyHash::new(book);
+        self.fonts = self.fonts.with_font(data);
         self
     }
 
@@ -366,7 +362,7 @@ impl typst::World for World {
     }
 
     fn book(&self) -> &LazyHash<FontBook> {
-        &self.book
+        self.fonts.book()
     }
 
     fn main(&self) -> FileId {
@@ -387,7 +383,7 @@ impl typst::World for World {
     }
 
     fn font(&self, index: usize) -> Option<Font> {
-        self.fonts.get(index).cloned()
+        self.fonts.font(index)
     }
 
     fn today(&self, _offset: Option<Duration>) -> Option<Datetime> {
