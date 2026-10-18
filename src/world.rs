@@ -44,6 +44,9 @@ pub struct World {
     /// When set, `source()` reads and populates through this shared cache
     /// instead of [`Self::sources`]. See [`Self::with_shared_sources`].
     shared_sources: Option<SourceSnapshot>,
+    /// Serve the main file from [`Self::sources`] even when a snapshot is
+    /// set. See [`Self::with_shared_sources_except_main`].
+    main_private: bool,
     dependencies: Mutex<HashSet<FileId>>,
     /// Package name → in-repo lib directory, for in-tree package development.
     overrides: HashMap<String, PathBuf>,
@@ -73,6 +76,7 @@ impl World {
             fonts: FontSet::default(),
             sources: Mutex::new(HashMap::new()),
             shared_sources: None,
+            main_private: false,
             dependencies: Mutex::new(HashSet::new()),
             overrides: HashMap::new(),
             source_overrides: HashMap::new(),
@@ -170,7 +174,19 @@ impl World {
     #[must_use]
     pub fn with_shared_sources(mut self, snapshot: &SourceSnapshot) -> Self {
         self.shared_sources = Some(snapshot.clone());
+        self.main_private = false;
         self
+    }
+
+    /// [`Self::with_shared_sources`], but the world's main file stays in its
+    /// private cache and never enters `snapshot`. Many worlds with different
+    /// main documents at one virtual path can then share the parses of every
+    /// file they import, and diagnostics keep naming the path the host chose.
+    #[must_use]
+    pub fn with_shared_sources_except_main(self, snapshot: &SourceSnapshot) -> Self {
+        let mut world = self.with_shared_sources(snapshot);
+        world.main_private = true;
+        world
     }
 
     /// Merge `scope`'s bindings into the evaluation library's global scope, so a
@@ -309,7 +325,8 @@ impl World {
     }
 
     /// `source()` through this world's private per-world cache — the default
-    /// when no [`Self::with_shared_sources`] snapshot is set.
+    /// when no [`Self::with_shared_sources`] snapshot is set, and the main
+    /// file's under [`Self::with_shared_sources_except_main`].
     fn source_private(&self, id: FileId) -> FileResult<Source> {
         if let Ok(cache) = self.sources.lock()
             && let Some(source) = cache.get(&id)
@@ -372,8 +389,10 @@ impl typst::World for World {
     fn source(&self, id: FileId) -> FileResult<Source> {
         self.record_dependency(id);
         match &self.shared_sources {
-            Some(snapshot) => self.source_shared(id, snapshot),
-            None => self.source_private(id),
+            Some(snapshot) if !(self.main_private && id == self.main_id) => {
+                self.source_shared(id, snapshot)
+            }
+            _ => self.source_private(id),
         }
     }
 

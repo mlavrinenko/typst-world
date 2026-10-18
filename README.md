@@ -61,7 +61,16 @@ A batch consumer evaluating many short-lived worlds can share work across
 them: a `World` with no custom inputs/globals shares one process-wide default
 eval library, and `SourceSnapshot` lets several worlds share one parsed-source
 cache via `World::with_shared_sources`, so a common imported prelude is parsed
-once no matter how many worlds read it.
+once no matter how many worlds read it. When each world brings its own main
+document at the same path, `World::with_shared_sources_except_main` keeps the
+main out of the snapshot and shares everything it imports:
+
+```rust,ignore
+let shared = SourceSnapshot::new();
+let left = World::with_provider(main, root.clone(), left_files).with_shared_sources_except_main(&shared);
+let right = World::with_provider(main, root, right_files).with_shared_sources_except_main(&shared);
+// Each evaluates its own `main.typ`; an import both read is parsed once.
+```
 
 Typst caches a `Bytes` hash inside the value, so a fresh copy per world means
 re-hashing the same data in every world. With `render` on, build a `FontSet`

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use typst::World as _;
 use typst::diag::{FileError, FileResult};
-use typst::foundations::Bytes;
+use typst::foundations::{Bytes, Value};
 use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 
 use super::{World, find_project_root};
@@ -257,4 +257,111 @@ fn _assert_send_sync<T: Send + Sync>() {}
 #[test]
 fn world_is_send_sync() {
     _assert_send_sync::<World>();
+}
+
+/// A world over `main` and the `lib.typ` it imports, counting reads into
+/// `reads`, on `snapshot` with its main kept private.
+fn world_with_main(main: &str, reads: &Arc<AtomicUsize>, snapshot: &SourceSnapshot) -> World {
+    let (main_id, lib_id) = (id("main.typ"), id("lib.typ"));
+    let mut files = HashMap::new();
+    files.insert(main_id, main.as_bytes().to_vec());
+    files.insert(lib_id, b"#let twice(x) = 2 * x".to_vec());
+    World::with_provider(
+        main_id,
+        PathBuf::from("/virtual"),
+        Box::new(CountingProvider {
+            files,
+            reads: Arc::clone(reads),
+        }),
+    )
+    .with_shared_sources_except_main(snapshot)
+}
+
+fn id(vpath: &str) -> FileId {
+    FileId::new(RootedPath::new(
+        VirtualRoot::Project,
+        VirtualPath::new(vpath).unwrap(),
+    ))
+}
+
+/// Evaluate `world`'s main file into its module, or its resolved error.
+fn eval_main(world: &World) -> Result<typst::foundations::Module, crate::EvalError> {
+    use comemo::Track as _;
+    use typst::engine::{Route, Sink, Traced};
+    let world_dyn: &dyn typst::World = world;
+    let source = world.source(world.main()).unwrap();
+    let mut sink = Sink::new();
+    let traced = Traced::default();
+    let route = Route::default();
+    typst_eval::eval(
+        world_dyn.track(),
+        world.library(),
+        traced.track(),
+        sink.track_mut(),
+        route.track(),
+        &source,
+    )
+    .map_err(|diags| world.eval_error(&diags))
+}
+
+fn out_of(world: &World) -> typst::foundations::Value {
+    let module = eval_main(world).unwrap();
+    let binding = module.scope().get("out").unwrap();
+    binding.read().clone()
+}
+
+#[test]
+fn shared_except_main_serves_each_world_its_own_main_at_one_path() {
+    let reads = Arc::new(AtomicUsize::new(0));
+    let snapshot = SourceSnapshot::new();
+    let left = world_with_main(
+        "#import \"lib.typ\": twice\n#let out = twice(2)",
+        &reads,
+        &snapshot,
+    );
+    let right = world_with_main(
+        "#import \"lib.typ\": twice\n#let out = twice(5)",
+        &reads,
+        &snapshot,
+    );
+
+    assert_eq!(out_of(&left), Value::Int(4));
+    assert_eq!(out_of(&right), Value::Int(10));
+    // Two mains plus one library read: the library is parsed once, shared.
+    assert_eq!(reads.load(Ordering::SeqCst), 3);
+    assert_eq!(snapshot.len(), 1);
+    assert!(snapshot.get(id("lib.typ")).is_some());
+    assert!(snapshot.get(id("main.typ")).is_none());
+}
+
+#[test]
+fn shared_except_main_reports_the_main_at_the_hosts_path() {
+    let reads = Arc::new(AtomicUsize::new(0));
+    let snapshot = SourceSnapshot::new();
+    let good = world_with_main("#let out = 1", &reads, &snapshot);
+    let bad = world_with_main("#import \"lib.typ\": twice\n#twice(", &reads, &snapshot);
+
+    assert_eq!(out_of(&good), Value::Int(1));
+    let err = eval_main(&bad).unwrap_err();
+    assert_eq!(err.main, "main.typ");
+    assert_eq!(err.main_location().unwrap().path, "main.typ");
+    assert!(snapshot.get(id("main.typ")).is_none());
+}
+
+#[test]
+fn shared_sources_still_caches_the_main_in_the_snapshot() {
+    let (main_id, _, mut files) = shared_file_setup();
+    files.insert(main_id, b"= Main".to_vec());
+    let snapshot = SourceSnapshot::new();
+    let world = World::with_provider(
+        main_id,
+        PathBuf::from("/virtual"),
+        Box::new(CountingProvider {
+            files,
+            reads: Arc::new(AtomicUsize::new(0)),
+        }),
+    )
+    .with_shared_sources(&snapshot);
+    world.source(main_id).unwrap();
+    assert!(snapshot.get(main_id).is_some());
 }

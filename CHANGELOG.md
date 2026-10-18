@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per world. `World::with_fonts` now reads one process-wide bundled set.
 - `BytesProvider::with_bytes` registers an already-built `Bytes` without
   copying it, so a host's process-wide copy of an embedded file is shared.
+- `World::with_shared_sources_except_main` shares every source but the main
+  file through a `SourceSnapshot`; the main stays in the world's own cache.
+  Worlds with different main documents at one virtual path share the parses
+  of what they import, and diagnostics keep the path the host chose.
 
 ## [0.5.3] - 2026-10-17
 

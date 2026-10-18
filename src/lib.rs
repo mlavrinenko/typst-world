@@ -25,7 +25,9 @@
 //! every world with no custom `inputs`/`globals` shares one process-wide default
 //! eval library, and [`SourceSnapshot`] lets several worlds share one parsed-source
 //! cache via [`World::with_shared_sources`], so a common imported prelude is
-//! parsed once no matter how many worlds read it. With `render` on, a `FontSet`
+//! parsed once no matter how many worlds read it.
+//! [`World::with_shared_sources_except_main`] keeps each world's own main file
+//! out of that cache, for worlds with different mains at one path. With `render` on, a `FontSet`
 //! built once and handed out via `World::with_font_set` keeps one copy of each
 //! face, and [`BytesProvider::with_bytes`] does the same for embedded files.
 //!
