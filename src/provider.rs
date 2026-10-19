@@ -6,6 +6,7 @@
 //! disk-oriented `root`/`overrides` it is handed.
 
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use typst::diag::{FileError, FileResult};
@@ -40,11 +41,42 @@ pub trait FileProvider: Send + Sync {
     fn read(&self, id: FileId, ctx: &ProviderCtx<'_>) -> FileResult<Bytes>;
 }
 
+/// The variable Typst's own `--package-path` reads its default from.
+const PACKAGE_PATH_ENV: &str = "TYPST_PACKAGE_PATH";
+
+/// The directory Typst reads `@local` packages from, the one holding
+/// `local/<name>/<version>/`: `$TYPST_PACKAGE_PATH` when set, else
+/// `dirs::data_dir()` joined with `typst/packages`. That is `%APPDATA%` on
+/// Windows, `~/Library/Application Support` on macOS and `$XDG_DATA_HOME` or
+/// `~/.local/share` on Linux. Typst and tinymist resolve it the same way.
+///
+/// [`DiskProvider`] reads through it, so a host that installs a package here
+/// is read back from where it wrote. `None` means no such directory: the
+/// variable is set but empty, which Typst refuses, or the platform has no data
+/// directory.
+#[must_use]
+pub fn platform_package_root() -> Option<PathBuf> {
+    package_root_from(std::env::var_os(PACKAGE_PATH_ENV), dirs::data_dir)
+}
+
+/// [`platform_package_root`] with its inputs passed in, so each case is
+/// testable without mutating the process environment.
+fn package_root_from(
+    package_path: Option<OsString>,
+    data_dir: fn() -> Option<PathBuf>,
+) -> Option<PathBuf> {
+    match package_path {
+        Some(value) if value.is_empty() => None,
+        Some(value) => Some(PathBuf::from(value)),
+        None => data_dir().map(|dir| dir.join("typst").join("packages")),
+    }
+}
+
 /// Where a provider looks for a `@local` package that no override names.
 #[derive(Debug, Clone, Default)]
 enum LocalPackages {
-    /// The platform local-package directory — `dirs::data_local_dir()` joined
-    /// with `typst/packages`. What Typst itself uses, and the default.
+    /// Typst's own local-package directory, [`platform_package_root`]. The
+    /// default.
     #[default]
     Platform,
     /// A caller-named directory holding `local/<name>/<version>/`.
@@ -64,9 +96,12 @@ impl LocalPackages {
     /// cannot have asked for and would otherwise see as a puzzling not-found.
     fn base(&self) -> FileResult<Option<PathBuf>> {
         match self {
-            Self::Platform => dirs::data_local_dir()
-                .map(|dir| Some(dir.join("typst").join("packages")))
-                .ok_or_else(|| FileError::Other(Some("could not determine local data dir".into()))),
+            Self::Platform => platform_package_root().map(Some).ok_or_else(|| {
+                FileError::Other(Some(
+                    "no local package directory: TYPST_PACKAGE_PATH is empty or there is no data dir"
+                        .into(),
+                ))
+            }),
             Self::At(dir) => Ok(Some(dir.clone())),
             Self::Nowhere => Ok(None),
         }
@@ -90,12 +125,11 @@ impl FileProvider for DiskProvider {
 /// [`DiskProvider`] with the local-package directory chosen by the caller
 /// instead of read off the platform.
 ///
-/// The platform lookup goes through `dirs`, which reads the environment on Unix
-/// only — on Windows it calls a known-folder API no variable can move. A host
-/// that keeps its own "where my data lives" setting therefore cannot express it
-/// by exporting `XDG_DATA_HOME`, and would install a package into one directory
-/// while reading from another. Handing the directory in closes that gap on
-/// every platform.
+/// The platform lookup, [`platform_package_root`], moves only with
+/// `$TYPST_PACKAGE_PATH` or, through `dirs`, with `XDG_DATA_HOME` on Unix. A
+/// host that keeps its own "where my data lives" setting would otherwise
+/// install a package into one directory while reading from another. Handing
+/// the directory in closes that gap on every platform.
 ///
 /// Explicit [`crate::World::with_local_package`] overrides still win; only the
 /// fallback moves.

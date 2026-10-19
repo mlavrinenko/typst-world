@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used)]
 
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use typst::diag::FileError;
@@ -8,8 +9,8 @@ use typst::syntax::package::{PackageSpec, PackageVersion};
 use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 
 use super::{
-    BytesProvider, DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider,
-    local_package_file_id, resolve_path, root_file_id,
+    BytesProvider, DiskProvider, FileProvider, PACKAGE_PATH_ENV, ProviderCtx, ScopedDiskProvider,
+    local_package_file_id, package_root_from, platform_package_root, resolve_path, root_file_id,
 };
 
 /// A package root holding one `@local/greet:0.1.0` whose `lib.typ` reads
@@ -133,6 +134,8 @@ fn resolve_path_package_override_wins_over_platform_dir() {
     );
 }
 
+/// The reader and [`platform_package_root`] are one answer, so a host that
+/// installs a package under that root is read back from it.
 #[test]
 fn resolve_path_local_package_without_override_uses_platform_dir() {
     let id = local_package_file_id("mindtape", "0.2.0", "lib.typ").unwrap();
@@ -140,8 +143,58 @@ fn resolve_path_local_package_without_override_uses_platform_dir() {
         root: Path::new("/proj"),
         overrides: &HashMap::new(),
     };
-    let path = resolve_path(id, &ctx).unwrap();
-    assert!(path.ends_with(Path::new("typst/packages/local/mindtape/0.2.0/lib.typ")));
+    let expected = platform_package_root()
+        .unwrap()
+        .join("local")
+        .join("mindtape")
+        .join("0.2.0")
+        .join("lib.typ");
+    assert_eq!(resolve_path(id, &ctx).unwrap(), expected);
+}
+
+/// A stand-in for `dirs::data_dir()`, so the fall-through is asserted without
+/// depending on the machine running the test.
+#[allow(clippy::unnecessary_wraps)] // must match `dirs::data_dir`'s signature
+fn machine_data() -> Option<PathBuf> {
+    Some(PathBuf::from("/machine/data"))
+}
+
+/// Unset, the root is the data directory joined with `typst/packages`.
+#[test]
+fn an_unset_package_path_reads_the_data_dir() {
+    assert_eq!(
+        package_root_from(None, machine_data),
+        Some(PathBuf::from("/machine/data/typst/packages"))
+    );
+}
+
+/// A set `$TYPST_PACKAGE_PATH` names the root whole, as `--package-path` does.
+#[test]
+fn a_set_package_path_names_the_root_whole() {
+    let root = package_root_from(Some(OsString::from("/pinned")), machine_data);
+    assert_eq!(root, Some(PathBuf::from("/pinned")));
+}
+
+/// Typst refuses an empty value, so it names no root rather than falling
+/// through to the machine's own.
+#[test]
+fn an_empty_package_path_names_no_root() {
+    assert_eq!(package_root_from(Some(OsString::new()), machine_data), None);
+}
+
+#[test]
+fn no_data_dir_names_no_root() {
+    assert_eq!(package_root_from(None, || None), None);
+}
+
+/// The entry point reads `$TYPST_PACKAGE_PATH`, then `dirs::data_dir()`, the
+/// lookup Typst and tinymist share. `data_local_dir()` differs on Windows.
+#[test]
+fn the_platform_root_is_typsts_lookup() {
+    assert_eq!(
+        platform_package_root(),
+        package_root_from(std::env::var_os(PACKAGE_PATH_ENV), dirs::data_dir)
+    );
 }
 
 /// The point of the type: `@local` comes from the directory the caller named,

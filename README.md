@@ -37,24 +37,39 @@ packages from embedded bytes for non-native targets (e.g. web builds).
 
 ### Where `@local` packages come from
 
-By default an `@local/<name>:<version>` import resolves under the platform
-local-package directory, the same place Typst itself looks. Two knobs move
-that: `World::with_local_package(name, dir)` pins one package to an in-repo
-lib directory, and `World::with_package_root(root)` moves the whole lookup —
-`root` being the directory that holds `local/<name>/<version>/`, which is what
-Typst's own `--package-path` names.
+By default an `@local/<name>:<version>` import resolves under the directory
+Typst and tinymist read it from. That's `$TYPST_PACKAGE_PATH` when set, else
+the platform data dir joined with `typst/packages`.
+
+| Platform | Directory |
+| --- | --- |
+| Linux | `$XDG_DATA_HOME/typst/packages` or `~/.local/share/typst/packages` |
+| macOS | `~/Library/Application Support/typst/packages` |
+| Windows | `%APPDATA%\typst\packages` |
+
+`platform_package_root()` returns that directory, so a host that installs a
+package for Typst writes it exactly where this crate reads it back.
+
+```rust,ignore
+let dir = typst_world::platform_package_root()
+    .ok_or("no local package directory")?
+    .join("local/my-pkg/0.1.0");
+```
+
+Two knobs move the lookup. `World::with_local_package(name, dir)` pins one
+package to an in-repo lib directory. `World::with_package_root(root)` moves
+the whole thing, where `root` holds `local/<name>/<version>/`, the same
+directory Typst's own `--package-path` names.
 
 ```rust,ignore
 let world = World::new(path)?.with_package_root(Some(my_data_dir.join("typst/packages")));
 ```
 
-A host with its own data-directory setting wants the second one. The platform
-lookup goes through `dirs`, which reads the environment on Unix only — on
-Windows it calls a known-folder API no variable can move — so exporting
-`XDG_DATA_HOME` redirects the lookup on Linux and nothing anywhere else, and a
-host that installs a package under its own setting would read from a different
-directory than it wrote to. Passing `None` says no local-package directory
-exists at all, leaving only the explicit per-package overrides: an answer, not
+A host with its own data-dir setting wants the second one. Without it, the
+only ways to move the platform lookup are `$TYPST_PACKAGE_PATH` and, on Unix
+only, `XDG_DATA_HOME`, so the host would install under its setting and read
+from somewhere else. Passing `None` says no local-package directory exists at
+all, which leaves just the explicit per-package overrides. It's an answer, not
 a fall-through to the machine's own.
 
 A batch consumer evaluating many short-lived worlds can share work across

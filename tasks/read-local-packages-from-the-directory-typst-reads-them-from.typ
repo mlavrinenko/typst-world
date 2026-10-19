@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "read local packages from the directory Typst reads them from",
-  status: proposed(2026, 10, 19),
+  status: done(2026, 10, 19),
 )
 
 == Summary

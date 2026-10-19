@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `platform_package_root()` returns the directory `DiskProvider` reads
+  `@local` packages from, so a host that installs a package writes it where
+  the reader looks.
+
+### Fixed
+
+- `DiskProvider` reads `@local` packages where Typst and tinymist do:
+  `$TYPST_PACKAGE_PATH` when set, else `dirs::data_dir()` joined with
+  `typst/packages`. On Windows that's `%APPDATA%`; it was `%LOCALAPPDATA%`,
+  so a package installed for Typst was a miss here.
+
 ## [0.5.4] - 2026-10-18
 
 ### Added
