@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "name a disk world's main file with slashes on Windows",
-  status: done(2026, 10, 28),
+  status: done(2026, 10, 28)[released in 0.5.6],
 )
 
 == Summary

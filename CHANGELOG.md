@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-10-28
+
 ### Added
 
 - `project_file_id(root, path)` returns the `FileId` of a file on disk under
-  `root`, spelled with `/` on every platform, so a host needs no path
-  conversion of its own.
+  `root`, spelled with `/` on every platform.
 
 ### Fixed
 
@@ -63,11 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `damage` names the pixel rectangles (`PixelRect`) where two laid-out pages
-  can differ once rasterised, and `rasterise_changes` brings a raster of the
-  first up to date with the second by redrawing only those. The result is
-  byte-identical to rasterising the second page whole: the page is rasterised
-  at its own transform with the items outside the damage dropped, and only the
-  damaged rectangles are copied out.
+  can differ once rasterised, and `rasterise_changes` redraws only those in a
+  raster of the first. The result is byte-identical to rasterising the second
+  page whole.
 
 ## [0.5.1] - 2026-10-17
 
@@ -124,36 +123,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `convert`'s content projection (`content_str`) no longer flattens a
-  multi-paragraph or list `Content` value into one run-on word.
-  `Content::plain_text()` only concatenates the leaf text it finds while
-  walking the tree, with nothing between a paragraph break or a list item and
-  the text before it — a status note's trailing `[…]` block with a blank-line
-  paragraph break or a bulleted list came back with the break silently
-  dropped, welding two sentences into one. Every `Par`/`ListItem`/`EnumItem`/
-  `TermItem` boundary now costs a separating space.
+- `convert`'s content projection (`content_str`) puts a space at every
+  `Par`/`ListItem`/`EnumItem`/`TermItem` boundary. `Content::plain_text()`
+  joins leaf text with nothing between, so a status note with a paragraph
+  break or a list came back with two sentences welded into one.
 
 ## [0.3.1] - 2026-08-17
 
 ### Added
 
 - `World::with_package_root(Option<PathBuf>)` and the `ScopedDiskProvider`
-  behind it: resolve `@local/<name>:<version>` under a directory the caller
-  names — the one holding `local/<name>/<version>/`, what Typst's own
-  `--package-path` names — instead of the platform local-package directory.
-  `None` states that no such directory exists, leaving only the explicit
-  `with_local_package` overrides; it is an answer, not a fall-through to the
-  machine's own. Not calling it keeps the platform lookup, so nothing changes
-  for a world that does not ask.
-
-  The platform lookup goes through `dirs`, which reads the environment on Unix
-  only — on Windows it calls a known-folder API no variable can move. A host
-  that keeps its own data-directory setting therefore could not express it, and
-  would install a package into one directory while reading from another.
-
-  Purely additive: `ProviderCtx`, `DiskProvider` and `resolve_path` are
-  untouched, and both providers resolve through one shared path so they cannot
-  diverge on anything but the package directory.
+  behind it resolve `@local/<name>:<version>` under a directory the caller
+  names, the one holding `local/<name>/<version>/` that Typst's
+  `--package-path` names. `None` says no such directory exists, leaving only
+  the `with_local_package` overrides. Not calling it keeps the platform
+  lookup. A host with its own data-directory setting needs it: `dirs` reads
+  the environment on Unix only, so on Windows no variable moves the lookup.
 
 ## [0.3.0] - 2026-08-01
 
