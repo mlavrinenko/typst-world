@@ -141,3 +141,88 @@ fn null_and_string_helpers() {
         Some("2026-01-01")
     );
 }
+
+/// Evaluate `#let out = <syntax>` in a world holding nothing else, and convert
+/// the result back.
+fn eval_syntax(syntax: &str) -> HVal {
+    use comemo::Track as _;
+    use typst::World as _;
+    use typst::engine::{Route, Sink, Traced};
+    let main = crate::root_file_id("main.typ").unwrap();
+    let source = format!("#let out = {syntax}");
+    let world = crate::World::with_provider(
+        main,
+        std::path::PathBuf::new(),
+        Box::new(crate::BytesProvider::new().with_file(main, source.into_bytes())),
+    );
+    let world_dyn: &dyn typst::World = &world;
+    let mut sink = Sink::new();
+    let module = typst_eval::eval(
+        world_dyn.track(),
+        world.library(),
+        Traced::default().track(),
+        sink.track_mut(),
+        Route::default().track(),
+        &world.source(main).unwrap(),
+    )
+    .unwrap_or_else(|diags| panic!("{syntax}: {}", world.eval_error(&diags)));
+    convert(module.scope().get("out").unwrap().read())
+}
+
+fn every_variant() -> HVal {
+    let map = |pairs: Vec<(&str, HVal)>| {
+        HVal::Dict(
+            pairs
+                .into_iter()
+                .map(|(key, val)| (key.to_owned(), val))
+                .collect(),
+        )
+    };
+    map(vec![
+        ("none", HVal::Null),
+        ("yes", HVal::Bool(true)),
+        ("neg", HVal::Int(-3)),
+        ("whole", HVal::Float(2.0)),
+        ("frac", HVal::Float(-1.5)),
+        ("inf", HVal::Float(f64::NEG_INFINITY)),
+        ("text", HVal::Str("a \"q\" \\ b\nc\t#d $e$".to_owned())),
+        ("day", HVal::Date("2026-10-28".to_owned())),
+        ("empty", HVal::Array(vec![])),
+        ("one", HVal::Array(vec![HVal::Int(1)])),
+        ("odd key: \"x\"", map(vec![])),
+        (
+            "nested",
+            map(vec![(
+                "in",
+                HVal::Array(vec![HVal::Null, HVal::Str(String::new())]),
+            )]),
+        ),
+    ])
+}
+
+#[test]
+fn to_typst_evaluates_back_to_the_same_value() {
+    let value = every_variant();
+    assert_eq!(eval_syntax(&value.to_typst()), value);
+}
+
+#[test]
+fn to_value_is_the_inverse_of_convert() {
+    let value = every_variant();
+    assert_eq!(convert(&value.to_value()), value);
+}
+
+#[test]
+fn to_value_makes_a_date_a_datetime() {
+    let date = HVal::Date("2026-10-28".to_owned()).to_value();
+    assert_eq!(
+        date,
+        Value::Datetime(Datetime::from_ymd(2026, 10, 28).unwrap())
+    );
+}
+
+#[test]
+fn to_value_keeps_a_date_that_names_no_day_as_its_text() {
+    let date = HVal::Date("0000-00-00".to_owned()).to_value();
+    assert_eq!(date, Value::Str("0000-00-00".into()));
+}

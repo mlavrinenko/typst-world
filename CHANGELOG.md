@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `World::with_main_source(main, root, source)` builds a disk-backed world
   whose main file is `source`, held in memory, for a host that evaluates
   source it generated.
+- `HVal::to_value` is the inverse of `convert`, and `HVal::to_typst` writes an
+  `HVal` as Typst syntax that evaluates back to an equal value.
+- A `serde` feature serializes and deserializes `HVal`. A date serializes as
+  its `YYYY-MM-DD` text and reads back as a string.
 
 ## [0.5.6] - 2026-10-28
 

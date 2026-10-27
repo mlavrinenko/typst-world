@@ -92,6 +92,70 @@ impl HVal {
     pub fn is_null(&self) -> bool {
         matches!(self, Self::Null)
     }
+
+    /// The Typst [`Value`] this was converted from: the inverse of [`convert`].
+    /// A [`HVal::Date`] becomes a `datetime`, unless its text names no real
+    /// day, such as the `0000-00-00` of a time-only `datetime`, which stays a
+    /// string.
+    #[must_use]
+    pub fn to_value(&self) -> Value {
+        match self {
+            Self::Null => Value::None,
+            Self::Bool(flag) => Value::Bool(*flag),
+            Self::Int(num) => Value::Int(*num),
+            Self::Float(num) => Value::Float(*num),
+            Self::Str(text) => Value::Str(text.as_str().into()),
+            Self::Date(text) => {
+                parse_date(text).map_or_else(|| Value::Str(text.as_str().into()), Value::Datetime)
+            }
+            Self::Array(items) => Value::Array(items.iter().map(Self::to_value).collect()),
+            Self::Dict(map) => Value::Dict(
+                map.iter()
+                    .map(|(key, val)| (key.as_str().into(), val.to_value()))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// This value as one line of Typst syntax, which evaluates back to an equal
+    /// [`HVal`]. A scalar is Typst's own `repr` of [`Self::to_value`], so a
+    /// string is escaped and a whole float keeps its `.0`. Containers are
+    /// written here: a one-element array keeps its trailing comma, and every
+    /// dict key is quoted, since Typst's `repr` leaves a keyword key such as
+    /// `in` bare, which doesn't parse.
+    #[must_use]
+    pub fn to_typst(&self) -> String {
+        match self {
+            Self::Array(items) => match items.as_slice() {
+                [] => "()".to_owned(),
+                [one] => format!("({},)", one.to_typst()),
+                many => format!("({})", join(many.iter().map(Self::to_typst))),
+            },
+            Self::Dict(map) if map.is_empty() => "(:)".to_owned(),
+            Self::Dict(map) => {
+                format!(
+                    "({})",
+                    join(map.iter().map(|(key, val)| {
+                        format!("{}: {}", key.as_str().repr(), val.to_typst())
+                    }))
+                )
+            }
+            scalar => scalar.to_value().repr().as_str().to_owned(),
+        }
+    }
+}
+
+fn join(parts: impl Iterator<Item = String>) -> String {
+    parts.collect::<Vec<_>>().join(", ")
+}
+
+/// The `datetime` a `YYYY-MM-DD` [`format_date`] wrote, if it names a real day.
+fn parse_date(text: &str) -> Option<Datetime> {
+    let mut parts = text.splitn(3, '-');
+    let year = parts.next()?.parse().ok()?;
+    let month = parts.next()?.parse().ok()?;
+    let day = parts.next()?.parse().ok()?;
+    Datetime::from_ymd(year, month, day)
 }
 
 /// Render a Typst [`Datetime`] as `YYYY-MM-DD`, leaving absent parts as zero.

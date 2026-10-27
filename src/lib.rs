@@ -49,6 +49,8 @@ mod provider;
 mod render;
 mod snapshot;
 mod value;
+#[cfg(feature = "serde")]
+mod value_serde;
 mod world;
 
 #[cfg(feature = "render")]

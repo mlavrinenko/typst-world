@@ -39,6 +39,15 @@ so Windows' `tasks\a.typ` is `/tasks/a.typ`, as `World::new` names its main.
 `World::with_main_source(main, root, source)` evaluates source you generated as
 the file `main` under `root`, importing the rest from disk.
 
+`HVal` is a harvested value with no Typst types in it. `to_typst()` writes one
+back as Typst syntax that evaluates to the same value, and the `serde` feature
+serializes it, a date as its `YYYY-MM-DD` text:
+
+```rust,ignore
+let call = format!("#check({})", value.to_typst()); // ("due": datetime(year: 2026, month: 10, day: 28),)
+let json = serde_json::to_string(&value)?;          // {"due":"2026-10-28"}
+```
+
 ### Where `@local` packages come from
 
 By default an `@local/<name>:<version>` import resolves under the directory
@@ -69,20 +78,16 @@ directory Typst's own `--package-path` names.
 let world = World::new(path)?.with_package_root(Some(my_data_dir.join("typst/packages")));
 ```
 
-A host with its own data-dir setting wants the second one. Without it, the
-only ways to move the platform lookup are `$TYPST_PACKAGE_PATH` and, on Unix
-only, `XDG_DATA_HOME`, so the host would install under its setting and read
-from somewhere else. Passing `None` says no local-package directory exists at
-all, which leaves just the explicit per-package overrides. It's an answer, not
-a fall-through to the machine's own.
+A host with its own data-dir setting wants the second one, since otherwise only
+`$TYPST_PACKAGE_PATH` and, on Unix, `XDG_DATA_HOME` move the lookup. Passing
+`None` says there's no local-package directory at all, leaving just the
+per-package overrides.
 
-A batch consumer evaluating many short-lived worlds can share work across
-them: a `World` with no custom inputs/globals shares one process-wide default
-eval library, and `SourceSnapshot` lets several worlds share one parsed-source
-cache via `World::with_shared_sources`, so a common imported prelude is parsed
-once no matter how many worlds read it. When each world brings its own main
-document at the same path, `World::with_shared_sources_except_main` keeps the
-main out of the snapshot and shares everything it imports:
+A batch of short-lived worlds can share work. A `World` with no custom inputs
+or globals shares one process-wide eval library, and a `SourceSnapshot` given
+to `World::with_shared_sources` parses a common prelude once for all of them.
+When each world brings its own main at the same path,
+`World::with_shared_sources_except_main` shares everything but the main:
 
 ```rust,ignore
 let shared = SourceSnapshot::new();
@@ -91,10 +96,9 @@ let right = World::with_provider(main, root, right_files).with_shared_sources_ex
 // Each evaluates its own `main.typ`; an import both read is parsed once.
 ```
 
-Typst caches a `Bytes` hash inside the value, so a fresh copy per world means
-re-hashing the same data in every world. With `render` on, build a `FontSet`
-once and hand it out; `with_fonts` already shares one process-wide bundled set.
-`BytesProvider::with_bytes` does the same for embedded files.
+Typst hashes a `Bytes` once per copy, so share copies across worlds. With
+`render` on, build one `FontSet` and hand it out (`with_fonts` already shares
+the bundled set); `BytesProvider::with_bytes` does the same for embedded files.
 
 ```rust,ignore
 let fonts = FontSet::bundled().with_font(my_font_bytes);
@@ -138,22 +142,18 @@ for diag in &err.diagnostics {
 ### Hit targets
 
 With the `render` feature, `render_with_targets` returns the raster frame plus
-a `HitTarget` for every `#link` on the page — the URL verbatim, and the
-rectangle the layout put it at in page points (top-left origin, same
-orientation as the frame):
+a `HitTarget` for every `#link` on the page: its URL and its rectangle in page
+points, with a top-left origin like the frame.
 
 ```rust,ignore
 let (frame, targets) = typst_world::render_with_targets(&world, 2.0)?;
 ```
 
-So a document can declare its own interactive regions — `#link("app:note/60",
-key)` — and the host routes pointer input onto them without repeating any
-layout math. Positions come from the very layout that drew the pixels, over
-the same single compile, so they cannot drift from the frame.
-
-Targets arrive in document order, which is paint order: for overlapping
-targets the last match wins. Only URL destinations are reported; links to a
-label or position inside the document are skipped.
+So a document declares its own interactive regions, such as
+`#link("app:note/60", key)`, and the host routes pointer input onto them with
+no layout math. The rectangles come from the compile that drew the pixels, so
+they can't drift. They arrive in paint order, so the last overlapping match
+wins, and a link to a label or a position isn't reported.
 
 ### Frame loops
 

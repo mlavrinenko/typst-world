@@ -32,10 +32,14 @@ typst-layout = { version = "0.15", optional = true }
 typst-render = { version = "0.15", optional = true }
 typst-svg = { version = "0.15", optional = true }
 typst-assets = { version = "0.15", features = ["fonts"], optional = true }
+# `HVal`'s `Serialize`/`Deserialize` (`value_serde.rs`); already in the tree
+# under `typst`, so the feature adds no crate to the build.
+serde = { version = "1", optional = true }
 
 [features]
 default = []
 render = ["dep:comemo", "dep:typst-layout", "dep:typst-render", "dep:typst-svg", "dep:typst-assets"]
+serde = ["dep:serde"]
 
 [dev-dependencies]
 tempfile = "3"
@@ -43,6 +47,9 @@ tempfile = "3"
 # Both are already in the tree under `typst`.
 comemo = "0.5"
 typst-eval = "0.15"
+# Round-trip `HVal` through JSON in the `serde` tests; already in the tree
+# under `typst`.
+serde_json = "1"
 
 [profile.release]
 strip = true
