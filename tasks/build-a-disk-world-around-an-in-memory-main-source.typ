@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "build a disk world around an in-memory main source",
-  status: done(2026, 10, 28),
+  status: done(2026, 10, 28)[released in 0.5.7],
 )
 
 == Summary

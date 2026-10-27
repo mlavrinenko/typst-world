@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "write an HVal back as a Typst value, as Typst syntax and through serde",
-  status: done(2026, 10, 28),
+  status: done(2026, 10, 28)[released in 0.5.7],
 )
 
 == Summary
