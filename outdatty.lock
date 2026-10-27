@@ -3,9 +3,9 @@ algorithm: blake3
 groups:
   api-docs:
     source:
-      src/lib.rs: b87275dba6863b5477218c83bccb20196efb5c34da286fc172b4f50e75cdcb9e
+      src/lib.rs: c8d1ba339fa869d1a3181383167dac019e0f70bc58ca8d1033a31d1fc74a0fd4
     dependents:
-      README.md: 6a01be190b69e6c7a157ac81d304ad59810cc3f67b1e60772765ed9fd688d204
+      README.md: 4ed22b5188496e4e74624be48921fcfc918c51df15416d4fcd607528b5a01d9c
       www/index.html: fa71f9d6ca639fbc2af2ca66520ceda9047fc3a864fb55fd3ba6e6e6d8e8d480
   dev-docs:
     source:
@@ -18,4 +18,4 @@ groups:
     source:
       Cargo.toml: cf3e49d834dc69077cea179aa8fb580651569e5d044a423290b7d6b2ba6d3bbd
     dependents:
-      CHANGELOG.md: 29de3222c551e74f0cfeba5045ba6a4d93ee9544ac2347cb7648adb3dcf0b42f
+      CHANGELOG.md: 4e0d64a60436f992ac54c08d0888853ea7accff425fd534c8d493ee19881e3b2

@@ -34,6 +34,8 @@ println!("{}", world.root().display());
 All byte reads go through a `FileProvider`, so the world is target-agnostic:
 `DiskProvider` reads from disk; `BytesProvider` feeds sources, fonts, and
 packages from embedded bytes for non-native targets (e.g. web builds).
+`project_file_id(root, path)` names a file on disk with `/` on every platform,
+so Windows' `tasks\a.typ` is `/tasks/a.typ`, as `World::new` names its main.
 
 ### Where `@local` packages come from
 

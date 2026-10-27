@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use typst::diag::{FileError, FileResult};
 use typst::foundations::Bytes;
 use typst::syntax::package::{PackageSpec, PackageVersion};
-use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
+use typst::syntax::{FileId, PathError, RootedPath, VirtualPath, VirtualRoot, VirtualizeError};
 
 use crate::WorldError;
 
@@ -215,6 +215,26 @@ impl FileProvider for BytesProvider {
 pub fn root_file_id(vpath: &str) -> Result<FileId, WorldError> {
     let vpath = VirtualPath::new(vpath)
         .map_err(|err| WorldError::World(format!("bad virtual path {vpath:?}: {err}")))?;
+    Ok(FileId::new(RootedPath::new(VirtualRoot::Project, vpath)))
+}
+
+/// The [`FileId`] of the project file at the platform path `path` under `root`,
+/// spelled with `/` on every platform. A Windows `tasks\a.typ` is
+/// `/tasks/a.typ` here, where [`root_file_id`] refuses the `\`. Nothing is read
+/// from disk: `root` must be a lexical prefix of `path`.
+///
+/// # Errors
+/// Returns [`WorldError`] if `path` is not under `root` or a component is not
+/// valid UTF-8.
+pub fn project_file_id(root: &Path, path: &Path) -> Result<FileId, WorldError> {
+    let vpath = VirtualPath::virtualize(root, path).map_err(|err| match err {
+        VirtualizeError::Path(PathError::Escapes) => WorldError::World(format!(
+            "file {} is not under project root {}",
+            path.display(),
+            root.display()
+        )),
+        other => WorldError::World(format!("bad virtual path {}: {other}", path.display())),
+    })?;
     Ok(FileId::new(RootedPath::new(VirtualRoot::Project, vpath)))
 }
 

@@ -10,7 +10,8 @@ use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 
 use super::{
     BytesProvider, DiskProvider, FileProvider, PACKAGE_PATH_ENV, ProviderCtx, ScopedDiskProvider,
-    local_package_file_id, package_root_from, platform_package_root, resolve_path, root_file_id,
+    local_package_file_id, package_root_from, platform_package_root, project_file_id, resolve_path,
+    root_file_id,
 };
 
 /// A package root holding one `@local/greet:0.1.0` whose `lib.typ` reads
@@ -70,6 +71,25 @@ fn root_file_id_builds_project_scoped_id() {
     let id = root_file_id("a/b.typ").unwrap();
     assert!(matches!(id.root(), VirtualRoot::Project));
     assert_eq!(id.vpath().get_without_slash(), "a/b.typ");
+}
+
+/// The path is `tasks\a.typ` under the root on Windows; the id is spelled with
+/// `/` on every platform.
+#[test]
+fn project_file_id_names_a_file_in_a_subfolder_with_slashes() {
+    let root = Path::new("/project");
+    let id = project_file_id(root, &root.join("tasks").join("a.typ")).unwrap();
+    assert!(matches!(id.root(), VirtualRoot::Project));
+    assert_eq!(id.vpath().get_with_slash(), "/tasks/a.typ");
+}
+
+#[test]
+fn project_file_id_refuses_a_file_outside_the_root() {
+    let err = project_file_id(Path::new("/project"), Path::new("/elsewhere/a.typ")).unwrap_err();
+    assert!(
+        err.to_string().contains("is not under project root"),
+        "{err}"
+    );
 }
 
 #[test]

@@ -58,7 +58,7 @@ pub use diagnostic::{Diagnostic, EvalError, Hint, Location, Severity, TracePoint
 pub use fonts::FontSet;
 pub use provider::{
     BytesProvider, DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider,
-    local_package_file_id, platform_package_root, resolve_path, root_file_id,
+    local_package_file_id, platform_package_root, project_file_id, resolve_path, root_file_id,
 };
 #[cfg(feature = "render")]
 pub use render::{

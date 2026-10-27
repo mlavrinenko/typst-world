@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `project_file_id(root, path)` returns the `FileId` of a file on disk under
+  `root`, spelled with `/` on every platform, so a host needs no path
+  conversion of its own.
+
+### Fixed
+
+- `World::new` and `World::with_root` load a main file in a subfolder on
+  Windows. They named it by the platform's relative path, `tasks\a.typ`,
+  which Typst refuses as a virtual path; they now name it `/tasks/a.typ`
+  through `VirtualPath::virtualize`.
+
 ## [0.5.5] - 2026-10-19
 
 ### Added

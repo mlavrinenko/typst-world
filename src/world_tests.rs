@@ -49,7 +49,28 @@ fn with_root_rejects_outside_file() {
     let file = outer.path().join("task.typ");
     std::fs::write(&file, "= x").unwrap();
     // file is not under `inner`, so construction must fail.
-    assert!(World::with_root(&file, inner.path()).is_err());
+    let err = World::with_root(&file, inner.path()).err().unwrap();
+    assert!(
+        err.to_string().contains("is not under project root"),
+        "{err}"
+    );
+}
+
+/// The relative path to the main file is `tasks\a.typ` on Windows, and Typst
+/// refuses `\` in a virtual path, so its id must be built from the path's
+/// components rather than from its platform spelling.
+#[test]
+fn with_root_names_a_main_file_in_a_subfolder_with_slashes() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("tasks");
+    std::fs::create_dir(&dir).unwrap();
+    let file = dir.join("a.typ");
+    std::fs::write(&file, "= In a folder").unwrap();
+
+    let world = World::with_root(&file, root.path()).unwrap();
+    assert_eq!(world.main().vpath().get_with_slash(), "/tasks/a.typ");
+    let source = world.source(world.main()).unwrap();
+    assert!(source.text().contains("In a folder"));
 }
 
 #[test]

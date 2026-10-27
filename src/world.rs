@@ -8,14 +8,16 @@ use std::sync::{Arc, LazyLock, Mutex};
 use chrono::Datelike;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime, Dict, Duration, Scope, Str, Value};
-use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
+use typst::syntax::{FileId, Source};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt};
 
 use crate::WorldError;
 use crate::fonts::FontSet;
-use crate::provider::{DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider};
+use crate::provider::{
+    DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider, project_file_id,
+};
 use crate::snapshot::SourceSnapshot;
 
 /// Process-wide default eval [`Library`] (no html/render features) — the exact
@@ -111,19 +113,7 @@ impl World {
     }
 
     fn disk(abs: &Path, root: PathBuf) -> Result<Self, WorldError> {
-        let rel = abs.strip_prefix(&root).map_err(|_| {
-            WorldError::World(format!(
-                "file {} is not under project root {}",
-                abs.display(),
-                root.display()
-            ))
-        })?;
-        let rel = rel
-            .to_str()
-            .ok_or_else(|| WorldError::World(format!("non-utf8 path: {}", rel.display())))?;
-        let vpath = VirtualPath::new(rel)
-            .map_err(|err| WorldError::World(format!("bad virtual path {rel:?}: {err}")))?;
-        let main_id = FileId::new(RootedPath::new(VirtualRoot::Project, vpath));
+        let main_id = project_file_id(&root, abs)?;
         Ok(Self::with_provider(main_id, root, Box::new(DiskProvider)))
     }
 
