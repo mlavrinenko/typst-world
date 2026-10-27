@@ -5,7 +5,7 @@ groups:
     source:
       src/lib.rs: c8d1ba339fa869d1a3181383167dac019e0f70bc58ca8d1033a31d1fc74a0fd4
     dependents:
-      README.md: 4ed22b5188496e4e74624be48921fcfc918c51df15416d4fcd607528b5a01d9c
+      README.md: 6ff4ae4e935c039f2bb761e9f02614a73ec6b05fd8fa0cb6be3c240afbaf7631
       www/index.html: fa71f9d6ca639fbc2af2ca66520ceda9047fc3a864fb55fd3ba6e6e6d8e8d480
   dev-docs:
     source:
@@ -18,4 +18,4 @@ groups:
     source:
       Cargo.toml: 9ee1caa524f884640b6e4ef3b4e131903e237b8a7ddeea04143147e9e719631c
     dependents:
-      CHANGELOG.md: fd40d75fa799e0d9ed95f9efde8c3961f783ffd435f124d4b69c0661f32fbf00
+      CHANGELOG.md: 029bb6e3e85f4781aae342fb813898c913983a9f3505c7ead605860fd484a69b

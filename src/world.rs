@@ -112,6 +112,17 @@ impl World {
         Self::disk(&abs, root)
     }
 
+    /// Build a disk-backed world whose main file `main` is `source`, held in
+    /// memory and never read from disk, for a host that evaluates source it
+    /// generated. Everything `source` imports resolves under `root`, a relative
+    /// import against `main`'s own virtual path. `root` is taken as given, not
+    /// canonicalized. Build `main` with [`crate::project_file_id`] or
+    /// [`crate::root_file_id`].
+    #[must_use]
+    pub fn with_main_source(main: FileId, root: PathBuf, source: impl Into<String>) -> Self {
+        Self::with_provider(main, root, Box::new(DiskProvider)).with_source_override(main, source)
+    }
+
     fn disk(abs: &Path, root: PathBuf) -> Result<Self, WorldError> {
         let main_id = project_file_id(&root, abs)?;
         Ok(Self::with_provider(main_id, root, Box::new(DiskProvider)))

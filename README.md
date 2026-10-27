@@ -36,6 +36,8 @@ All byte reads go through a `FileProvider`, so the world is target-agnostic:
 packages from embedded bytes for non-native targets (e.g. web builds).
 `project_file_id(root, path)` names a file on disk with `/` on every platform,
 so Windows' `tasks\a.typ` is `/tasks/a.typ`, as `World::new` names its main.
+`World::with_main_source(main, root, source)` evaluates source you generated as
+the file `main` under `root`, importing the rest from disk.
 
 ### Where `@local` packages come from
 

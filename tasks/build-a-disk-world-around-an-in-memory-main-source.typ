@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "build a disk world around an in-memory main source",
-  status: proposed(2026, 10, 28),
+  status: done(2026, 10, 28),
 )
 
 == Summary

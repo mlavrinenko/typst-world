@@ -386,3 +386,17 @@ fn shared_sources_still_caches_the_main_in_the_snapshot() {
     world.source(main_id).unwrap();
     assert!(snapshot.get(main_id).is_some());
 }
+
+/// A generated probe at `/probe/main.typ` that exists only in memory reads the
+/// project's files from disk, by an absolute and a relative import.
+#[test]
+fn with_main_source_evaluates_an_in_memory_main_against_the_disk() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("lib.typ"), "#let one = 1").unwrap();
+    std::fs::write(root.path().join("two.typ"), "#let two = 2").unwrap();
+    let source = "#import \"/lib.typ\": one\n#import \"../two.typ\": two\n#let out = one + two";
+
+    let world = World::with_main_source(id("probe/main.typ"), root.path().to_path_buf(), source);
+    assert!(!root.path().join("probe").exists());
+    assert_eq!(out_of(&world), Value::Int(3));
+}

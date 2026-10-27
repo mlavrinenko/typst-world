@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `World::with_main_source(main, root, source)` builds a disk-backed world
+  whose main file is `source`, held in memory, for a host that evaluates
+  source it generated.
+
 ## [0.5.6] - 2026-10-28
 
 ### Added
