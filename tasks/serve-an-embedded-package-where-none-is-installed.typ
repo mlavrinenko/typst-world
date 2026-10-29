@@ -2,7 +2,7 @@
 
 #show: task.with(
   title: "serve an embedded package where none is installed",
-  status: proposed(2026, 10, 29),
+  status: done(2026, 10, 29)[released in 0.5.8],
 )
 
 == Summary

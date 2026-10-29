@@ -400,3 +400,24 @@ fn with_main_source_evaluates_an_in_memory_main_against_the_disk() {
     assert!(!root.path().join("probe").exists());
     assert_eq!(out_of(&world), Value::Int(3));
 }
+
+/// A provider swapped in after the world is built serves the package its
+/// main source imports, and the in-memory main stays in place.
+#[test]
+fn with_file_provider_replaces_the_reader_and_keeps_the_main_source() {
+    let root = tempfile::tempdir().unwrap();
+    let source = "#import \"@local/pkg:0.1.0\": one\n#let out = one + 1";
+    let provider = crate::BytesProvider::new()
+        .with_file(
+            local_package_file_id("pkg", "0.1.0", "typst.toml").unwrap(),
+            "[package]\nname = \"pkg\"\nversion = \"0.1.0\"\nentrypoint = \"lib.typ\"\n",
+        )
+        .with_file(
+            local_package_file_id("pkg", "0.1.0", "lib.typ").unwrap(),
+            "#let one = 1",
+        );
+
+    let world = World::with_main_source(id("main.typ"), root.path().to_path_buf(), source)
+        .with_file_provider(Box::new(provider));
+    assert_eq!(out_of(&world), Value::Int(2));
+}

@@ -159,6 +159,17 @@ impl World {
         self
     }
 
+    /// Read this world's files through `provider` instead, keeping its main
+    /// file, root, source overrides and package overrides. For a host that
+    /// wraps a disk provider, such as one serving a package it embeds when no
+    /// package directory holds it. [`Self::with_package_root`] replaces the
+    /// provider too, so call this after it.
+    #[must_use]
+    pub fn with_file_provider(mut self, provider: Box<dyn FileProvider>) -> Self {
+        self.provider = provider;
+        self
+    }
+
     /// Back `id` with an in-memory `source`, consulted before the provider.
     #[must_use]
     pub fn with_source_override(mut self, id: FileId, source: impl Into<String>) -> Self {

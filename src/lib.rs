@@ -9,7 +9,9 @@
 //! keeps its own data-directory setting). All byte reads go through
 //! a [`FileProvider`], so the world is target-agnostic: native reads disk via
 //! [`DiskProvider`]; a web build feeds sources, fonts, and packages from
-//! embedded bytes behind the same trait ([`BytesProvider`]).
+//! embedded bytes behind the same trait ([`BytesProvider`]). A
+//! [`FallbackProvider`] chains two, so a host can serve a package it embeds
+//! where no package directory holds it ([`World::with_file_provider`]).
 //!
 //! It evaluates a `.typ` file with `typst_eval` (never layout or render, unless
 //! the `render` feature is on) and projects Typst values to a Typst-free [`HVal`]
@@ -59,7 +61,7 @@ pub use diagnostic::{Diagnostic, EvalError, Hint, Location, Severity, TracePoint
 #[cfg(feature = "render")]
 pub use fonts::FontSet;
 pub use provider::{
-    BytesProvider, DiskProvider, FileProvider, ProviderCtx, ScopedDiskProvider,
+    BytesProvider, DiskProvider, FallbackProvider, FileProvider, ProviderCtx, ScopedDiskProvider,
     local_package_file_id, platform_package_root, project_file_id, resolve_path, root_file_id,
 };
 #[cfg(feature = "render")]

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `FallbackProvider::new(first, second)` reads each file through `first`, then
+  through `second` where `first` fails, so a host can serve a package it
+  embeds wherever no package directory holds it.
+- `World::with_file_provider(provider)` swaps a built world's file provider,
+  keeping its main file, root and overrides.
+
 ## [0.5.7] - 2026-10-28
 
 ### Added

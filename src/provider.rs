@@ -207,6 +207,34 @@ impl FileProvider for BytesProvider {
     }
 }
 
+/// Two providers in order: `first` answers every id it can read, and `second`
+/// answers the rest. For a host that embeds a package its users may also
+/// install, where an installed copy wins and the embedded one fills in.
+///
+/// When both fail, `first`'s error is the one returned, since it names where
+/// the file was looked for on disk.
+#[derive(Debug)]
+pub struct FallbackProvider<A, B> {
+    first: A,
+    second: B,
+}
+
+impl<A, B> FallbackProvider<A, B> {
+    /// Read through `first`, then through `second` where `first` fails.
+    #[must_use]
+    pub fn new(first: A, second: B) -> Self {
+        Self { first, second }
+    }
+}
+
+impl<A: FileProvider, B: FileProvider> FileProvider for FallbackProvider<A, B> {
+    fn read(&self, id: FileId, ctx: &ProviderCtx<'_>) -> FileResult<Bytes> {
+        self.first
+            .read(id, ctx)
+            .or_else(|err| self.second.read(id, ctx).map_err(|_| err))
+    }
+}
+
 /// The [`FileId`] of a project-local (package-less) file at `vpath`, e.g. the
 /// main document source a [`BytesProvider`] serves.
 ///

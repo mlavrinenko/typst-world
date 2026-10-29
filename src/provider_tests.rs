@@ -9,9 +9,9 @@ use typst::syntax::package::{PackageSpec, PackageVersion};
 use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 
 use super::{
-    BytesProvider, DiskProvider, FileProvider, PACKAGE_PATH_ENV, ProviderCtx, ScopedDiskProvider,
-    local_package_file_id, package_root_from, platform_package_root, project_file_id, resolve_path,
-    root_file_id,
+    BytesProvider, DiskProvider, FallbackProvider, FileProvider, PACKAGE_PATH_ENV, ProviderCtx,
+    ScopedDiskProvider, local_package_file_id, package_root_from, platform_package_root,
+    project_file_id, resolve_path, root_file_id,
 };
 
 /// A package root holding one `@local/greet:0.1.0` whose `lib.typ` reads
@@ -302,4 +302,38 @@ fn resolve_path_rejects_non_local_namespace_without_override() {
         resolve_path(id, &ctx),
         Err(FileError::NotFound(_))
     ));
+}
+
+/// The first provider wins where it has the file; the second answers where it
+/// fails, and the first's error stands when both fail.
+#[test]
+fn fallback_provider_reads_the_second_only_where_the_first_fails() {
+    let id = local_package_file_id("greet", "0.1.0", "lib.typ").unwrap();
+    let other = local_package_file_id("greet", "0.1.0", "other.typ").unwrap();
+    let installed = package_root("#let installed = 1");
+    let embedded = BytesProvider::new().with_file(id, *b"#let embedded = 1");
+    let overrides = HashMap::new();
+    let ctx = ctx_with(Path::new("/virtual"), &overrides);
+
+    let both = FallbackProvider::new(
+        ScopedDiskProvider::new(Some(installed.path().to_path_buf())),
+        BytesProvider::new().with_file(id, *b"#let embedded = 1"),
+    );
+    assert_eq!(
+        both.read(id, &ctx).unwrap().as_slice(),
+        b"#let installed = 1"
+    );
+
+    let empty = tempfile::tempdir().unwrap();
+    let only_embedded = FallbackProvider::new(
+        ScopedDiskProvider::new(Some(empty.path().to_path_buf())),
+        embedded,
+    );
+    assert_eq!(
+        only_embedded.read(id, &ctx).unwrap().as_slice(),
+        b"#let embedded = 1"
+    );
+    assert!(
+        matches!(only_embedded.read(other, &ctx), Err(FileError::NotFound(path)) if path.starts_with(empty.path()))
+    );
 }

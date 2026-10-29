@@ -31,9 +31,9 @@ println!("{}", world.root().display());
 # Ok::<(), typst_world::WorldError>(())
 ```
 
-All byte reads go through a `FileProvider`, so the world is target-agnostic:
-`DiskProvider` reads from disk; `BytesProvider` feeds sources, fonts, and
-packages from embedded bytes for non-native targets (e.g. web builds).
+Byte reads go through a `FileProvider`: `DiskProvider` reads disk,
+`BytesProvider` embedded bytes, and a `FallbackProvider` that
+`World::with_file_provider` swaps in serves an embedded package where none is installed.
 `project_file_id(root, path)` names a file on disk with `/` on every platform,
 so Windows' `tasks\a.typ` is `/tasks/a.typ`, as `World::new` names its main.
 `World::with_main_source(main, root, source)` evaluates source you generated as
